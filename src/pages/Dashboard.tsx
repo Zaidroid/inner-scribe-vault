@@ -1,26 +1,74 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import StatsCard from '@/components/StatsCard';
 import QuickActions from '@/components/QuickActions';
 import HabitCard from '@/components/HabitCard';
 import AIInsightCard from '@/components/AIInsightCard';
 import { Card } from '@/components/ui/card';
+import { useJournal, useHabits } from '@/hooks/useDatabase';
 import { Calendar, List, User, Check } from 'lucide-react';
 
 const Dashboard = () => {
-  // Mock data - replace with real data from your storage
+  const { entries } = useJournal();
+  const { habits, toggleHabit } = useHabits();
+  const [moodScore, setMoodScore] = useState(0);
+
+  useEffect(() => {
+    // Calculate mood score from recent entries
+    if (entries.length > 0) {
+      const recentEntries = entries.slice(0, 7); // Last 7 entries
+      const moodValues = { terrible: 1, bad: 2, okay: 3, good: 4, great: 5 };
+      const totalMood = recentEntries.reduce((sum, entry) => {
+        return sum + (moodValues[entry.mood as keyof typeof moodValues] || 3);
+      }, 0);
+      const avgMood = totalMood / recentEntries.length;
+      setMoodScore(Math.round(avgMood * 2) / 2); // Round to nearest 0.5
+    }
+  }, [entries]);
+
+  const completedHabitsToday = habits.filter(h => h.completed).length;
+  const longestStreak = Math.max(...habits.map(h => h.streak), 0);
+  
+  const weekEntries = entries.filter(entry => {
+    const entryDate = new Date(entry.date);
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    return entryDate >= weekAgo;
+  }).length;
+
   const stats = [
-    { title: 'Journal Entries', value: 12, icon: Calendar, trend: '+3 this week', color: 'primary' as const },
-    { title: 'Habits Tracked', value: 8, icon: List, trend: '5 active', color: 'info' as const },
-    { title: 'Streak Days', value: 15, icon: Check, trend: 'Personal best!', color: 'success' as const },
-    { title: 'Mood Score', value: '8.2', icon: User, trend: '+1.2 vs last week', color: 'warning' as const },
+    { 
+      title: 'Journal Entries', 
+      value: entries.length, 
+      icon: Calendar, 
+      trend: `+${weekEntries} this week`, 
+      color: 'primary' as const 
+    },
+    { 
+      title: 'Active Habits', 
+      value: habits.length, 
+      icon: List, 
+      trend: `${completedHabitsToday} completed today`, 
+      color: 'info' as const 
+    },
+    { 
+      title: 'Longest Streak', 
+      value: longestStreak, 
+      icon: Check, 
+      trend: 'Keep it up!', 
+      color: 'success' as const 
+    },
+    { 
+      title: 'Mood Score', 
+      value: moodScore.toFixed(1), 
+      icon: User, 
+      trend: 'Based on recent entries', 
+      color: 'warning' as const 
+    },
   ];
 
-  const habits = [
-    { id: '1', name: 'Morning Meditation', streak: 7, completed: true, target: 1, current: 1 },
-    { id: '2', name: 'Read 30 mins', streak: 5, completed: false, target: 30, current: 15 },
-    { id: '3', name: 'Exercise', streak: 3, completed: true, target: 1, current: 1 },
-  ];
+  const recentHabits = habits.slice(0, 3);
 
   const aiInsights = [
     {
@@ -38,12 +86,19 @@ const Dashboard = () => {
   ];
 
   const handleHabitToggle = (id: string) => {
-    console.log('Toggle habit:', id);
-    // Implement habit toggle logic
+    const habit = habits.find(h => h.id === id);
+    if (habit) {
+      toggleHabit(id, !habit.completed, habit.target);
+    }
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-6"
+    >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold gradient-text">Welcome back!</h1>
@@ -62,45 +117,83 @@ const Dashboard = () => {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
-          <div key={index} style={{ animationDelay: `${index * 100}ms` }}>
+          <motion.div 
+            key={index}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: index * 0.1 }}
+          >
             <StatsCard {...stat} />
-          </div>
+          </motion.div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Actions */}
-        <div className="lg:col-span-1">
+        <motion.div 
+          className="lg:col-span-1"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
+        >
           <QuickActions />
-        </div>
+        </motion.div>
 
         {/* Recent Habits */}
-        <div className="lg:col-span-2">
+        <motion.div 
+          className="lg:col-span-2"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
+        >
           <Card className="glass-card p-6">
             <h3 className="text-lg font-semibold mb-4">Today's Habits</h3>
             <div className="grid gap-4">
-              {habits.map((habit) => (
-                <HabitCard
-                  key={habit.id}
-                  habit={habit}
-                  onToggle={handleHabitToggle}
-                />
-              ))}
+              {recentHabits.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  No habits yet. Start building your routine!
+                </div>
+              ) : (
+                recentHabits.map((habit, index) => (
+                  <motion.div
+                    key={habit.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.1 }}
+                  >
+                    <HabitCard
+                      habit={habit}
+                      onToggle={handleHabitToggle}
+                    />
+                  </motion.div>
+                ))
+              )}
             </div>
           </Card>
-        </div>
+        </motion.div>
       </div>
 
       {/* AI Insights */}
-      <div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.7 }}
+      >
         <h3 className="text-lg font-semibold mb-4">AI Insights</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {aiInsights.map((insight, index) => (
-            <AIInsightCard key={index} insight={insight} />
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.8 + index * 0.1 }}
+            >
+              <AIInsightCard insight={insight} />
+            </motion.div>
           ))}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 

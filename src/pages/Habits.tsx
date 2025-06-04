@@ -1,11 +1,14 @@
 
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import HabitCard from '@/components/HabitCard';
+import { useHabits } from '@/hooks/useDatabase';
+import { useToast } from '@/hooks/use-toast';
 import { Plus, List, Calendar } from 'lucide-react';
 
 const Habits = () => {
@@ -14,47 +17,68 @@ const Habits = () => {
   const [newHabitFrequency, setNewHabitFrequency] = useState('daily');
   const [newHabitTarget, setNewHabitTarget] = useState('1');
 
-  const habits = [
-    { id: '1', name: 'Morning Meditation', streak: 7, completed: true, target: 1, current: 1 },
-    { id: '2', name: 'Read 30 minutes', streak: 5, completed: false, target: 30, current: 15 },
-    { id: '3', name: 'Exercise', streak: 3, completed: true, target: 1, current: 1 },
-    { id: '4', name: 'Write in journal', streak: 10, completed: true, target: 1, current: 1 },
-    { id: '5', name: 'Drink 8 glasses of water', streak: 2, completed: false, target: 8, current: 5 },
-  ];
+  const { habits, loading, addHabit, toggleHabit } = useHabits();
+  const { toast } = useToast();
 
-  const handleAddHabit = () => {
-    if (newHabitName.trim()) {
-      const habit = {
-        id: Date.now().toString(),
-        name: newHabitName,
-        frequency: newHabitFrequency,
-        target: parseInt(newHabitTarget),
-        current: 0,
-        streak: 0,
-        completed: false,
-      };
-      
-      console.log('Adding habit:', habit);
-      // Implement save logic to IndexedDB
+  const handleAddHabit = async () => {
+    if (!newHabitName.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a habit name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const habit = {
+      name: newHabitName,
+      frequency: newHabitFrequency,
+      target: parseInt(newHabitTarget),
+    };
+    
+    try {
+      await addHabit(habit);
+      toast({
+        title: "Habit Added",
+        description: `"${newHabitName}" has been added to your habits.`,
+      });
       
       // Reset form
       setNewHabitName('');
       setNewHabitTarget('1');
       setNewHabitFrequency('daily');
       setShowAddForm(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add habit. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleHabitToggle = (id: string) => {
-    console.log('Toggle habit:', id);
-    // Implement habit toggle logic
+  const handleHabitToggle = async (id: string) => {
+    const habit = habits.find(h => h.id === id);
+    if (habit) {
+      await toggleHabit(id, !habit.completed, habit.target);
+    }
   };
 
-  const weeklyProgress = 85; // Mock data
-  const monthlyProgress = 72; // Mock data
+  // Calculate progress statistics
+  const completedToday = habits.filter(h => h.completed).length;
+  const totalHabits = habits.length;
+  const weeklyProgress = totalHabits > 0 ? Math.round((completedToday / totalHabits) * 100) : 0;
+  
+  const totalStreak = habits.reduce((sum, habit) => sum + habit.streak, 0);
+  const avgStreak = totalHabits > 0 ? Math.round(totalStreak / totalHabits) : 0;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-6"
+    >
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold gradient-text">Habits</h1>
@@ -71,93 +95,132 @@ const Habits = () => {
 
       {/* Progress Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="glass-card p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
-            <Calendar className="h-5 w-5 mr-2" />
-            Weekly Progress
-          </h3>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Completion Rate</span>
-              <span className="font-medium">{weeklyProgress}%</span>
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+        >
+          <Card className="glass-card p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center">
+              <Calendar className="h-5 w-5 mr-2" />
+              Today's Progress
+            </h3>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Completion Rate</span>
+                <span className="font-medium">{weeklyProgress}%</span>
+              </div>
+              <Progress value={weeklyProgress} className="h-3" />
+              <p className="text-xs text-muted-foreground">
+                {completedToday} out of {totalHabits} habits completed
+              </p>
             </div>
-            <Progress value={weeklyProgress} className="h-3" />
-            <p className="text-xs text-muted-foreground">5 out of 7 days this week</p>
-          </div>
-        </Card>
+          </Card>
+        </motion.div>
 
-        <Card className="glass-card p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
-            <List className="h-5 w-5 mr-2" />
-            Monthly Progress
-          </h3>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Completion Rate</span>
-              <span className="font-medium">{monthlyProgress}%</span>
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <Card className="glass-card p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center">
+              <List className="h-5 w-5 mr-2" />
+              Average Streak
+            </h3>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Days</span>
+                <span className="font-medium">{avgStreak}</span>
+              </div>
+              <div className="text-2xl font-bold text-primary">{avgStreak} days</div>
+              <p className="text-xs text-muted-foreground">Keep building those streaks!</p>
             </div>
-            <Progress value={monthlyProgress} className="h-3" />
-            <p className="text-xs text-muted-foreground">22 out of 30 days this month</p>
-          </div>
-        </Card>
+          </Card>
+        </motion.div>
       </div>
 
       {/* Add Habit Form */}
-      {showAddForm && (
-        <Card className="glass-card p-6 animate-fade-in">
-          <h3 className="text-lg font-semibold mb-4">Add New Habit</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Habit Name</label>
-              <Input
-                placeholder="e.g., Morning meditation"
-                value={newHabitName}
-                onChange={(e) => setNewHabitName(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Frequency</label>
-              <Select value={newHabitFrequency} onValueChange={setNewHabitFrequency}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Target</label>
-              <Input
-                type="number"
-                placeholder="1"
-                value={newHabitTarget}
-                onChange={(e) => setNewHabitTarget(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex gap-2 mt-4">
-            <Button onClick={handleAddHabit} className="bg-gradient-primary hover:opacity-90">
-              Add Habit
-            </Button>
-            <Button variant="outline" onClick={() => setShowAddForm(false)}>
-              Cancel
-            </Button>
-          </div>
-        </Card>
-      )}
+      <AnimatePresence>
+        {showAddForm && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card className="glass-card p-6">
+              <h3 className="text-lg font-semibold mb-4">Add New Habit</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Habit Name</label>
+                  <Input
+                    placeholder="e.g., Morning meditation"
+                    value={newHabitName}
+                    onChange={(e) => setNewHabitName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Frequency</label>
+                  <Select value={newHabitFrequency} onValueChange={setNewHabitFrequency}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Target</label>
+                  <Input
+                    type="number"
+                    placeholder="1"
+                    value={newHabitTarget}
+                    onChange={(e) => setNewHabitTarget(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button onClick={handleAddHabit} className="bg-gradient-primary hover:opacity-90">
+                  Add Habit
+                </Button>
+                <Button variant="outline" onClick={() => setShowAddForm(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Habits List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {habits.map((habit, index) => (
-          <div key={habit.id} style={{ animationDelay: `${index * 100}ms` }}>
-            <HabitCard habit={habit} onToggle={handleHabitToggle} />
+        {loading ? (
+          <div className="col-span-full text-center text-muted-foreground">Loading habits...</div>
+        ) : habits.length === 0 ? (
+          <div className="col-span-full text-center text-muted-foreground">
+            No habits yet. Add your first habit to get started!
           </div>
-        ))}
+        ) : (
+          <AnimatePresence>
+            {habits.map((habit, index) => (
+              <motion.div 
+                key={habit.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+              >
+                <HabitCard habit={habit} onToggle={handleHabitToggle} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        )}
       </div>
-    </div>
+    </motion.div>
   );
 };
 
