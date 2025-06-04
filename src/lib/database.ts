@@ -1,171 +1,333 @@
-
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { encrypt, decrypt } from './encryption';
 
-interface SelfMasteryDB extends DBSchema {
-  journal: {
-    key: string;
-    value: {
-      id: string;
-      title: string;
-      content: string;
-      mood: string;
-      tags: string[];
-      date: string;
-      encrypted: boolean;
-    };
-  };
-  habits: {
-    key: string;
-    value: {
-      id: string;
-      name: string;
-      frequency: string;
-      target: number;
-      current: number;
-      streak: number;
-      completed: boolean;
-      createdAt: string;
-      completions: Array<{ date: string; value: number }>;
-    };
-  };
-  settings: {
-    key: string;
-    value: {
-      key: string;
-      value: any;
-      encrypted: boolean;
-    };
-  };
+interface JournalEntry {
+  id: string;
+  title: string;
+  content: string;
+  mood: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
-class DatabaseManager {
-  private db: IDBPDatabase<SelfMasteryDB> | null = null;
+interface Habit {
+  id: string;
+  name: string;
+  description: string;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  completed: boolean;
+  streak?: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
-  async init() {
-    this.db = await openDB<SelfMasteryDB>('selfmastery', 1, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains('journal')) {
-          db.createObjectStore('journal', { keyPath: 'id' });
+interface Setting {
+  key: string;
+  value: any;
+}
+
+interface Goal {
+  id: string;
+  title: string;
+  description: string;
+  category: 'health' | 'career' | 'personal' | 'financial' | 'relationships';
+  targetValue: number;
+  currentValue: number;
+  unit: string;
+  deadline: string;
+  priority: 'low' | 'medium' | 'high';
+  status: 'active' | 'completed' | 'paused';
+  createdAt: string;
+  updatedAt: string;
+}
+
+class Database {
+  private db: IDBDatabase | null = null;
+  private readonly DB_NAME = 'SelfMasteryDB';
+  private readonly DB_VERSION = 2; // Incremented for goals support
+
+  async init(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        this.db = request.result;
+        resolve();
+      };
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        
+        // Create object stores if they don't exist
+        if (!db.objectStoreNames.contains('journal_entries')) {
+          db.createObjectStore('journal_entries', { keyPath: 'id' });
         }
+        
         if (!db.objectStoreNames.contains('habits')) {
           db.createObjectStore('habits', { keyPath: 'id' });
         }
+        
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'key' });
         }
-      },
+
+        // Add goals store in version 2
+        if (!db.objectStoreNames.contains('goals')) {
+          db.createObjectStore('goals', { keyPath: 'id' });
+        }
+      };
     });
   }
 
-  // Journal Methods
-  async saveJournalEntry(entry: any) {
+  // Journal methods
+  async saveJournalEntry(entry: JournalEntry): Promise<void> {
     if (!this.db) await this.init();
+
     const encryptedEntry = {
       ...entry,
+      title: encrypt(entry.title),
       content: encrypt(entry.content),
-      encrypted: true,
+      tags: entry.tags.map(tag => encrypt(tag)),
     };
-    return this.db!.put('journal', encryptedEntry);
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['journal_entries'], 'readwrite');
+      const store = transaction.objectStore('journal_entries');
+      const request = store.put(encryptedEntry);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
   }
 
-  async getJournalEntries() {
+  async getJournalEntries(): Promise<JournalEntry[]> {
     if (!this.db) await this.init();
-    const entries = await this.db!.getAll('journal');
-    return entries.map(entry => ({
-      ...entry,
-      content: entry.encrypted ? decrypt(entry.content) : entry.content,
-    }));
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['journal_entries'], 'readonly');
+      const store = transaction.objectStore('journal_entries');
+      const request = store.getAll();
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const entries = request.result.map((entry: any) => ({
+          ...entry,
+          title: decrypt(entry.title),
+          content: decrypt(entry.content),
+          tags: entry.tags.map((tag: string) => decrypt(tag)),
+        }));
+        resolve(entries);
+      };
+    });
   }
 
-  async deleteJournalEntry(id: string) {
+  async deleteJournalEntry(id: string): Promise<void> {
     if (!this.db) await this.init();
-    return this.db!.delete('journal', id);
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['journal_entries'], 'readwrite');
+      const store = transaction.objectStore('journal_entries');
+      const request = store.delete(id);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
   }
 
-  // Habits Methods
-  async saveHabit(habit: any) {
+  // Habit methods
+  async saveHabit(habit: Habit): Promise<void> {
     if (!this.db) await this.init();
-    return this.db!.put('habits', habit);
+
+    const encryptedHabit = {
+      ...habit,
+      name: encrypt(habit.name),
+      description: encrypt(habit.description),
+    };
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['habits'], 'readwrite');
+      const store = transaction.objectStore('habits');
+      const request = store.put(encryptedHabit);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
   }
 
-  async getHabits() {
+  async getHabits(): Promise<Habit[]> {
     if (!this.db) await this.init();
-    return this.db!.getAll('habits');
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['habits'], 'readonly');
+      const store = transaction.objectStore('habits');
+      const request = store.getAll();
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const habits = request.result.map((habit: any) => ({
+          ...habit,
+          name: decrypt(habit.name),
+          description: decrypt(habit.description),
+        }));
+        resolve(habits);
+      };
+    });
   }
 
-  async updateHabitCompletion(id: string, completed: boolean, value: number = 1) {
+  async deleteHabit(id: string): Promise<void> {
     if (!this.db) await this.init();
-    const habit = await this.db!.get('habits', id);
-    if (habit) {
-      const today = new Date().toISOString().split('T')[0];
-      const existingCompletion = habit.completions.find(c => c.date === today);
-      
-      if (existingCompletion) {
-        existingCompletion.value = completed ? value : 0;
-      } else {
-        habit.completions.push({ date: today, value: completed ? value : 0 });
-      }
-      
-      habit.completed = completed;
-      habit.current = completed ? value : 0;
-      
-      // Update streak
-      if (completed) {
-        habit.streak += 1;
-      } else {
-        habit.streak = 0;
-      }
-      
-      return this.db!.put('habits', habit);
-    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['habits'], 'readwrite');
+      const store = transaction.objectStore('habits');
+      const request = store.delete(id);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
   }
 
-  async deleteHabit(id: string) {
+  // Goal methods
+  async saveGoal(goal: Goal): Promise<void> {
     if (!this.db) await this.init();
-    return this.db!.delete('habits', id);
-  }
-
-  // Settings Methods
-  async saveSetting(key: string, value: any, encrypted: boolean = true) {
-    if (!this.db) await this.init();
-    const settingValue = encrypted ? encrypt(value) : value;
-    return this.db!.put('settings', { key, value: settingValue, encrypted });
-  }
-
-  async getSetting(key: string) {
-    if (!this.db) await this.init();
-    const setting = await this.db!.get('settings', key);
-    if (setting) {
-      return setting.encrypted ? decrypt(setting.value) : setting.value;
-    }
-    return null;
-  }
-
-  // Export/Import Methods
-  async exportData() {
-    if (!this.db) await this.init();
-    const journals = await this.getJournalEntries();
-    const habits = await this.getHabits();
-    const settings = await this.db!.getAll('settings');
     
+    const encryptedGoal = {
+      ...goal,
+      title: encrypt(goal.title),
+      description: encrypt(goal.description),
+    };
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['goals'], 'readwrite');
+      const store = transaction.objectStore('goals');
+      const request = store.put(encryptedGoal);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+  }
+
+  async getGoals(): Promise<Goal[]> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['goals'], 'readonly');
+      const store = transaction.objectStore('goals');
+      const request = store.getAll();
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const goals = request.result.map((goal: any) => ({
+          ...goal,
+          title: decrypt(goal.title),
+          description: decrypt(goal.description),
+        }));
+        resolve(goals);
+      };
+    });
+  }
+
+  async deleteGoal(id: string): Promise<void> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['goals'], 'readwrite');
+      const store = transaction.objectStore('goals');
+      const request = store.delete(id);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+  }
+
+  // Settings methods
+  async saveSetting(key: string, value: any): Promise<void> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['settings'], 'readwrite');
+      const store = transaction.objectStore('settings');
+      const request = store.put({ key, value });
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+  }
+
+  async getSetting(key: string): Promise<any> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['settings'], 'readonly');
+      const store = transaction.objectStore('settings');
+      const request = store.get(key);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const result = request.result;
+        resolve(result ? result.value : null);
+      };
+    });
+  }
+
+  async exportData(): Promise<any> {
+    const [journals, habits, goals, settings] = await Promise.all([
+      this.getJournalEntries(),
+      this.getHabits(),
+      this.getGoals(),
+      this.getAllSettings(),
+    ]);
+
     return {
+      version: '1.0',
+      exportDate: new Date().toISOString(),
       journals,
       habits,
-      settings: settings.map(s => ({
-        key: s.key,
-        value: s.encrypted ? decrypt(s.value) : s.value,
-      })),
-      exportDate: new Date().toISOString(),
+      goals,
+      settings,
     };
   }
 
-  async clearAllData() {
+  async clearAllData(): Promise<void> {
     if (!this.db) await this.init();
-    await this.db!.clear('journal');
-    await this.db!.clear('habits');
-    await this.db!.clear('settings');
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['journal_entries', 'habits', 'goals', 'settings'], 'readwrite');
+      
+      const stores = ['journal_entries', 'habits', 'goals', 'settings'];
+      let completed = 0;
+      
+      stores.forEach(storeName => {
+        const store = transaction.objectStore(storeName);
+        const request = store.clear();
+        
+        request.onsuccess = () => {
+          completed++;
+          if (completed === stores.length) {
+            resolve();
+          }
+        };
+        
+        request.onerror = () => reject(request.error);
+      });
+    });
+  }
+
+  async getAllSettings(): Promise<Setting[]> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['settings'], 'readonly');
+      const store = transaction.objectStore('settings');
+      const request = store.getAll();
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        resolve(request.result);
+      };
+    });
   }
 }
 
-export const db = new DatabaseManager();
+export const db = new Database();

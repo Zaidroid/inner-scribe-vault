@@ -1,23 +1,20 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { db } from '@/lib/database';
 import { obsidianSync } from '@/lib/obsidian';
 import { useToast } from '@/hooks/use-toast';
-import { Settings as SettingsIcon, User, Calendar, List, Download, Upload, Trash2 } from 'lucide-react';
+import { Settings as SettingsIcon, Calendar, List, Download, Upload, Trash2 } from 'lucide-react';
+import AIProviderConfig from '@/components/AIProviderConfig';
 
 const Settings = () => {
   const [obsidianPath, setObsidianPath] = useState('');
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [encryptionEnabled, setEncryptionEnabled] = useState(true);
-  const [aiEnabled, setAiEnabled] = useState(true);
-  const [ollamaEndpoint, setOllamaEndpoint] = useState('http://localhost:11434');
   
   const { toast } = useToast();
 
@@ -29,24 +26,18 @@ const Settings = () => {
     try {
       const savedObsidianPath = await db.getSetting('obsidianPath');
       const savedSyncEnabled = await db.getSetting('syncEnabled');
-      const savedAiEnabled = await db.getSetting('aiEnabled');
-      const savedOllamaEndpoint = await db.getSetting('ollamaEndpoint');
 
       if (savedObsidianPath) setObsidianPath(savedObsidianPath);
       if (savedSyncEnabled !== null) setSyncEnabled(savedSyncEnabled);
-      if (savedAiEnabled !== null) setAiEnabled(savedAiEnabled);
-      if (savedOllamaEndpoint) setOllamaEndpoint(savedOllamaEndpoint);
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
   };
 
-  const saveSettings = async () => {
+  const saveObsidianSettings = async () => {
     try {
       await db.saveSetting('obsidianPath', obsidianPath);
       await db.saveSetting('syncEnabled', syncEnabled);
-      await db.saveSetting('aiEnabled', aiEnabled);
-      await db.saveSetting('ollamaEndpoint', ollamaEndpoint);
 
       // Update Obsidian integration
       obsidianSync.updateConfig({
@@ -55,13 +46,13 @@ const Settings = () => {
       });
 
       toast({
-        title: "Settings Saved",
-        description: "Your preferences have been updated.",
+        title: "Obsidian Settings Saved",
+        description: "Your Obsidian integration preferences have been updated.",
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save settings.",
+        description: "Failed to save Obsidian settings.",
         variant: "destructive",
       });
     }
@@ -151,30 +142,6 @@ const Settings = () => {
     }
   };
 
-  const handleTestOllama = async () => {
-    try {
-      const response = await fetch(`${ollamaEndpoint}/api/version`);
-      if (response.ok) {
-        toast({
-          title: "Connection Successful",
-          description: "Ollama is running and accessible.",
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: "Failed to connect to Ollama",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Connection Failed",
-        description: "Failed to connect to Ollama. Make sure it's running.",
-        variant: "destructive",
-      });
-    }
-  };
-
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -194,48 +161,7 @@ const Settings = () => {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
         >
-          <Card className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center">
-              <User className="h-5 w-5 mr-2" />
-              AI Configuration
-            </h3>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="ai-enabled">Enable AI Insights</Label>
-                <Switch
-                  id="ai-enabled"
-                  checked={aiEnabled}
-                  onCheckedChange={setAiEnabled}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="ollama-endpoint" className="mb-2 block">Ollama Endpoint</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="ollama-endpoint"
-                    placeholder="http://localhost:11434"
-                    value={ollamaEndpoint}
-                    onChange={(e) => setOllamaEndpoint(e.target.value)}
-                  />
-                  <Button size="sm" onClick={handleTestOllama} variant="outline">
-                    Test
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Make sure Ollama is running locally for AI features
-                </p>
-              </div>
-
-              <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                <p className="text-sm text-blue-400">
-                  <strong>Note:</strong> AI processing happens locally through Ollama. 
-                  No data is sent to external servers.
-                </p>
-              </div>
-            </div>
-          </Card>
+          <AIProviderConfig />
         </motion.div>
 
         {/* Obsidian Integration */}
@@ -262,8 +188,9 @@ const Settings = () => {
 
               <div>
                 <Label htmlFor="obsidian-path" className="mb-2 block">Vault Path</Label>
-                <Input
+                <input
                   id="obsidian-path"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   placeholder="/path/to/your/obsidian/vault"
                   value={obsidianPath}
                   onChange={(e) => setObsidianPath(e.target.value)}
@@ -273,6 +200,13 @@ const Settings = () => {
                   Journal entries will be exported as markdown files
                 </p>
               </div>
+
+              <Button 
+                onClick={saveObsidianSettings}
+                className="w-full bg-gradient-primary hover:opacity-90"
+              >
+                Save Obsidian Settings
+              </Button>
 
               <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
                 <p className="text-sm text-green-400">
@@ -319,7 +253,7 @@ const Settings = () => {
               <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/20">
                 <p className="text-sm text-purple-400">
                   <strong>🔒 Data Protection:</strong> All your data is encrypted with AES-256 
-                  and stored locally on your device. Nothing is sent to external servers.
+                  and stored locally on your device. Nothing is sent to external servers unless you use API-based AI providers.
                 </p>
               </div>
 
@@ -328,6 +262,7 @@ const Settings = () => {
                 <div className="text-xs text-muted-foreground space-y-1">
                   <p>• Journal entries: Encrypted locally</p>
                   <p>• Habits data: Encrypted locally</p>
+                  <p>• Goals: Encrypted locally</p>
                   <p>• AI insights: Generated and stored locally</p>
                   <p>• No cloud backup (by design)</p>
                 </div>
@@ -387,22 +322,11 @@ const Settings = () => {
         </motion.div>
       </div>
 
-      {/* Save Settings Button */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.5 }}
-      >
-        <Button onClick={saveSettings} className="w-full bg-gradient-primary hover:opacity-90">
-          Save All Settings
-        </Button>
-      </motion.div>
-
       {/* App Information */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.6 }}
+        transition={{ duration: 0.5, delay: 0.5 }}
       >
         <Card className="glass-card p-6">
           <h3 className="text-lg font-semibold mb-4">About SelfMastery</h3>
@@ -413,7 +337,7 @@ const Settings = () => {
             </div>
             <div>
               <p className="font-medium">Last Updated</p>
-              <p className="text-muted-foreground">January 2024</p>
+              <p className="text-muted-foreground">January 2025</p>
             </div>
             <div>
               <p className="font-medium">Data Location</p>
@@ -421,7 +345,7 @@ const Settings = () => {
             </div>
             <div>
               <p className="font-medium">Privacy</p>
-              <p className="text-muted-foreground">100% Local Processing</p>
+              <p className="text-muted-foreground">Local + Optional Cloud AI</p>
             </div>
           </div>
         </Card>
