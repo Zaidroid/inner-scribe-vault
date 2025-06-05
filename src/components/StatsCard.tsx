@@ -8,10 +8,11 @@ interface StatsCardProps {
   value: string | number;
   icon: LucideIcon;
   trend?: string;
+  subtitle?: string;
   color?: string;
 }
 
-const StatsCard = ({ title, value, icon: Icon, trend, color = 'primary' }: StatsCardProps) => {
+const StatsCard = ({ title, value, icon: Icon, trend, subtitle, color = 'primary' }: StatsCardProps) => {
   const colorClasses = {
     primary: 'text-purple-400 bg-purple-400/10',
     success: 'text-green-400 bg-green-400/10',
@@ -25,6 +26,9 @@ const StatsCard = ({ title, value, icon: Icon, trend, color = 'primary' }: Stats
         <div>
           <p className="text-sm text-muted-foreground mb-1">{title}</p>
           <p className="text-2xl font-bold">{value}</p>
+          {subtitle && (
+            <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+          )}
           {trend && (
             <p className="text-xs text-muted-foreground mt-1">{trend}</p>
           )}

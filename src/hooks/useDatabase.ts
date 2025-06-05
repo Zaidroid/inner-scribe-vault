@@ -9,7 +9,7 @@ export const useJournal = () => {
   const loadEntries = async () => {
     try {
       const journalEntries = await db.getJournalEntries();
-      setEntries(journalEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setEntries(journalEntries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch (error) {
       console.error('Failed to load journal entries:', error);
     } finally {
@@ -22,7 +22,7 @@ export const useJournal = () => {
       await db.saveJournalEntry({
         ...entry,
         id: Date.now().toString(),
-        date: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       });
       await loadEntries();
     } catch (error) {
@@ -80,8 +80,19 @@ export const useHabits = () => {
 
   const toggleHabit = async (id: string, completed: boolean, value: number = 1) => {
     try {
-      await db.updateHabitCompletion(id, completed, value);
-      await loadHabits();
+      const habits = await db.getHabits();
+      const habit = habits.find(h => h.id === id);
+      if (habit) {
+        const updatedHabit = {
+          ...habit,
+          completed,
+          current: completed ? value : 0,
+          streak: completed ? (habit.streak || 0) + 1 : 0,
+          updatedAt: new Date().toISOString()
+        };
+        await db.saveHabit(updatedHabit);
+        await loadHabits();
+      }
     } catch (error) {
       console.error('Failed to update habit:', error);
     }
@@ -101,4 +112,85 @@ export const useHabits = () => {
   }, []);
 
   return { habits, loading, addHabit, toggleHabit, deleteHabit, refreshHabits: loadHabits };
+};
+
+export const useGoals = () => {
+  const [goals, setGoals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadGoals = async () => {
+    try {
+      const goalList = await db.getGoals();
+      setGoals(goalList);
+    } catch (error) {
+      console.error('Failed to load goals:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addGoal = async (goal: any) => {
+    try {
+      await db.saveGoal({
+        ...goal,
+        id: Date.now().toString(),
+        currentValue: 0,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      });
+      await loadGoals();
+    } catch (error) {
+      console.error('Failed to save goal:', error);
+    }
+  };
+
+  const updateGoal = async (id: string, updates: any) => {
+    try {
+      const goals = await db.getGoals();
+      const goal = goals.find(g => g.id === id);
+      if (goal) {
+        const updatedGoal = {
+          ...goal,
+          ...updates,
+          updatedAt: new Date().toISOString()
+        };
+        await db.saveGoal(updatedGoal);
+        await loadGoals();
+      }
+    } catch (error) {
+      console.error('Failed to update goal:', error);
+    }
+  };
+
+  const deleteGoal = async (id: string) => {
+    try {
+      await db.deleteGoal(id);
+      await loadGoals();
+    } catch (error) {
+      console.error('Failed to delete goal:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadGoals();
+  }, []);
+
+  return { goals, loading, addGoal, updateGoal, deleteGoal, refreshGoals: loadGoals };
+};
+
+// Combined hook for convenience
+export const useDatabase = () => {
+  const journal = useJournal();
+  const habits = useHabits();
+  const goals = useGoals();
+
+  return {
+    journalEntries: journal.entries,
+    habits: habits.habits,
+    goals: goals.goals,
+    loading: journal.loading || habits.loading || goals.loading,
+    ...journal,
+    ...habits,
+    ...goals
+  };
 };
