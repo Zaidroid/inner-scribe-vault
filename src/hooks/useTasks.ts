@@ -22,6 +22,7 @@ export const useTasks = () => {
       await db.saveTask({
         ...task,
         id: Date.now().toString(),
+        dependencies: task.dependencies || [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -51,6 +52,21 @@ export const useTasks = () => {
 
   const deleteTask = async (id: string) => {
     try {
+      // Remove this task from any dependencies
+      const allTasks = await db.getTasks();
+      const tasksToUpdate = allTasks.filter(task => 
+        task.dependencies && task.dependencies.includes(id)
+      );
+
+      for (const task of tasksToUpdate) {
+        const updatedDependencies = task.dependencies.filter((depId: string) => depId !== id);
+        await db.saveTask({
+          ...task,
+          dependencies: updatedDependencies,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
       await db.deleteTask(id);
       await loadTasks();
     } catch (error) {

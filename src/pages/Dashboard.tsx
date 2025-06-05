@@ -4,16 +4,20 @@ import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useDatabase } from '@/hooks/useDatabase';
+import { useFinance } from '@/hooks/useFinance';
+import { useTasks } from '@/hooks/useTasks';
 import StatsCard from '@/components/StatsCard';
 import AIInsightCard from '@/components/AIInsightCard';
 import QuickActions from '@/components/QuickActions';
 import MeditationTimer from '@/components/MeditationTimer';
 import GoalTracker from '@/components/GoalTracker';
-import { Calendar, TrendingUp, Target, Brain, Timer } from 'lucide-react';
+import { Calendar, TrendingUp, Target, Brain, Timer, DollarSign, CheckSquare } from 'lucide-react';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const { journalEntries, habits, loading } = useDatabase();
+  const { transactions, budgets } = useFinance();
+  const { tasks } = useTasks();
 
   // Calculate stats
   const totalEntries = journalEntries.length;
@@ -30,6 +34,17 @@ const Dashboard = () => {
 
   const currentStreak = habits.reduce((max, habit) => Math.max(max, habit.streak || 0), 0);
 
+  // Finance stats
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+  const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+  const netBalance = totalIncome - totalExpenses;
+
+  // Task stats
+  const completedTasks = tasks.filter(task => task.status === 'done').length;
+  const inProgressTasks = tasks.filter(task => task.status === 'in-progress').length;
+  const totalTasks = tasks.length;
+  const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: TrendingUp },
     { id: 'meditation', label: 'Meditation', icon: Timer },
@@ -43,13 +58,6 @@ const Dashboard = () => {
         <div className="animate-pulse">
           <div className="h-8 bg-muted rounded w-1/3 mb-2"></div>
           <div className="h-4 bg-muted rounded w-1/2"></div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="animate-pulse">
-              <div className="h-32 bg-muted rounded"></div>
-            </div>
-          ))}
         </div>
       </div>
     );
@@ -119,21 +127,21 @@ const Dashboard = () => {
               
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
                 <StatsCard
-                  title="Current Streak"
-                  value={currentStreak.toString()}
-                  subtitle="days"
-                  icon={Target}
-                  trend={currentStreak > 0 ? 'up' : 'neutral'}
+                  title="Net Balance"
+                  value={`$${netBalance.toFixed(2)}`}
+                  subtitle={`${transactions.length} transactions`}
+                  icon={DollarSign}
+                  trend={netBalance > 0 ? 'up' : netBalance < 0 ? 'down' : 'neutral'}
                 />
               </motion.div>
               
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
                 <StatsCard
-                  title="Weekly Growth"
-                  value={entriesThisWeek > 3 ? 'Excellent' : entriesThisWeek > 1 ? 'Good' : 'Needs Focus'}
-                  subtitle="reflection activity"
-                  icon={Brain}
-                  trend={entriesThisWeek > 3 ? 'up' : entriesThisWeek > 1 ? 'neutral' : 'down'}
+                  title="Task Progress"
+                  value={`${taskCompletionRate}%`}
+                  subtitle={`${completedTasks}/${totalTasks} completed`}
+                  icon={CheckSquare}
+                  trend={taskCompletionRate >= 75 ? 'up' : taskCompletionRate >= 50 ? 'neutral' : 'down'}
                 />
               </motion.div>
             </div>

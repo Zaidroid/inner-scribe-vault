@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Flag, Trash2, Edit } from 'lucide-react';
+import { Calendar, Flag, Trash2, Edit, Link } from 'lucide-react';
 
 interface TaskColumnProps {
   column: {
@@ -16,9 +16,10 @@ interface TaskColumnProps {
   onDragEnd: (taskId: string, newStatus: string) => void;
   onUpdateTask: (taskId: string, updates: any) => void;
   onDeleteTask: (taskId: string) => void;
+  onTaskClick?: (task: any) => void;
 }
 
-const TaskColumn = ({ column, tasks, onDragEnd, onUpdateTask, onDeleteTask }: TaskColumnProps) => {
+const TaskColumn = ({ column, tasks, onDragEnd, onUpdateTask, onDeleteTask, onTaskClick }: TaskColumnProps) => {
   const [draggedOver, setDraggedOver] = useState(false);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -80,7 +81,10 @@ const TaskColumn = ({ column, tasks, onDragEnd, onUpdateTask, onDeleteTask }: Ta
             onDragStart={(e) => handleDragStart(e, task.id)}
             className="cursor-move"
           >
-            <Card className="p-4 bg-card/60 border hover:bg-card/80 transition-colors">
+            <Card 
+              className="p-4 bg-card/60 border hover:bg-card/80 transition-colors cursor-pointer"
+              onClick={() => onTaskClick?.(task)}
+            >
               <div className="space-y-3">
                 <div className="flex items-start justify-between">
                   <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
@@ -89,7 +93,10 @@ const TaskColumn = ({ column, tasks, onDragEnd, onUpdateTask, onDeleteTask }: Ta
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0"
-                      onClick={() => onDeleteTask(task.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteTask(task.id);
+                      }}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -115,6 +122,15 @@ const TaskColumn = ({ column, tasks, onDragEnd, onUpdateTask, onDeleteTask }: Ta
                     </div>
                   )}
                 </div>
+
+                {task.dependencies && task.dependencies.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    <Link className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">
+                      {task.dependencies.length} dependencies
+                    </span>
+                  </div>
+                )}
 
                 {task.assignee && (
                   <div className="flex items-center gap-1">
