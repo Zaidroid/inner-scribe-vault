@@ -19,17 +19,22 @@ interface TaskEditModalProps {
 }
 
 const TaskEditModal = ({ task, isOpen, onClose, onSave, allTasks }: TaskEditModalProps) => {
-  const [editedTask, setEditedTask] = useState(task);
-  const [dependencies, setDependencies] = useState<string[]>(task?.dependencies || []);
+  const [editedTask, setEditedTask] = useState(task || {});
+  const [dependencies, setDependencies] = useState<string[]>([]);
 
   useEffect(() => {
     if (task) {
       setEditedTask(task);
       setDependencies(task.dependencies || []);
+    } else {
+      setEditedTask({});
+      setDependencies([]);
     }
   }, [task]);
 
   const handleSave = () => {
+    if (!task?.id) return;
+    
     onSave(task.id, {
       ...editedTask,
       dependencies
@@ -72,13 +77,13 @@ const TaskEditModal = ({ task, isOpen, onClose, onSave, allTasks }: TaskEditModa
               <Label htmlFor="title">Title</Label>
               <Input
                 id="title"
-                value={editedTask.title}
+                value={editedTask.title || ''}
                 onChange={(e) => setEditedTask({ ...editedTask, title: e.target.value })}
               />
             </div>
             <div>
               <Label htmlFor="status">Status</Label>
-              <Select value={editedTask.status} onValueChange={(value) => setEditedTask({ ...editedTask, status: value })}>
+              <Select value={editedTask.status || 'todo'} onValueChange={(value) => setEditedTask({ ...editedTask, status: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -96,7 +101,7 @@ const TaskEditModal = ({ task, isOpen, onClose, onSave, allTasks }: TaskEditModa
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              value={editedTask.description}
+              value={editedTask.description || ''}
               onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
               rows={3}
             />
@@ -105,7 +110,7 @@ const TaskEditModal = ({ task, isOpen, onClose, onSave, allTasks }: TaskEditModa
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="priority">Priority</Label>
-              <Select value={editedTask.priority} onValueChange={(value) => setEditedTask({ ...editedTask, priority: value })}>
+              <Select value={editedTask.priority || 'medium'} onValueChange={(value) => setEditedTask({ ...editedTask, priority: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -121,7 +126,7 @@ const TaskEditModal = ({ task, isOpen, onClose, onSave, allTasks }: TaskEditModa
               <Input
                 id="dueDate"
                 type="date"
-                value={editedTask.dueDate}
+                value={editedTask.dueDate || ''}
                 onChange={(e) => setEditedTask({ ...editedTask, dueDate: e.target.value })}
               />
             </div>
@@ -129,7 +134,7 @@ const TaskEditModal = ({ task, isOpen, onClose, onSave, allTasks }: TaskEditModa
               <Label htmlFor="assignee">Assignee</Label>
               <Input
                 id="assignee"
-                value={editedTask.assignee}
+                value={editedTask.assignee || ''}
                 onChange={(e) => setEditedTask({ ...editedTask, assignee: e.target.value })}
                 placeholder="Assignee name"
               />
