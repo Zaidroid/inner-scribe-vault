@@ -77,12 +77,11 @@ const TaskColumn = ({ column, tasks, onDragEnd, onUpdateTask, onDeleteTask, onTa
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            draggable
-            onDragStart={(e) => handleDragStart(e, task.id)}
-            className="cursor-move"
           >
             <Card 
-              className="p-4 bg-card/60 border hover:bg-card/80 transition-colors cursor-pointer"
+              className="p-4 bg-card/60 border hover:bg-card/80 transition-colors cursor-move"
+              draggable
+              onDragStart={(e) => handleDragStart(e, task.id)}
               onClick={() => onTaskClick?.(task)}
             >
               <div className="space-y-3">
