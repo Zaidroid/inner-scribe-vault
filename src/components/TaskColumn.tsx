@@ -39,6 +39,10 @@ const TaskColumn = ({ column, tasks, onDragEnd, onUpdateTask, onDeleteTask }: Ta
     }
   };
 
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    e.dataTransfer.setData('text/plain', taskId);
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high': return 'bg-red-500';
@@ -73,9 +77,7 @@ const TaskColumn = ({ column, tasks, onDragEnd, onUpdateTask, onDeleteTask }: Ta
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
             draggable
-            onDragStart={(e) => {
-              e.dataTransfer.setData('text/plain', task.id);
-            }}
+            onDragStart={(e) => handleDragStart(e, task.id)}
             className="cursor-move"
           >
             <Card className="p-4 bg-card/60 border hover:bg-card/80 transition-colors">
