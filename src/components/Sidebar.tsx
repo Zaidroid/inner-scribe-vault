@@ -3,7 +3,9 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { User, Calendar, List, Settings, Plus } from 'lucide-react';
+import { User, Calendar, List, Settings, Plus, DollarSign } from 'lucide-react';
+import { Kanban } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 
 const Sidebar = () => {
   const location = useLocation();
@@ -13,6 +15,8 @@ const Sidebar = () => {
     { path: '/', icon: User, label: 'Dashboard' },
     { path: '/journal', icon: Calendar, label: 'Journal' },
     { path: '/habits', icon: List, label: 'Habits' },
+    { path: '/finance', icon: DollarSign, label: 'Finance' },
+    { path: '/tasks', icon: Kanban, label: 'Tasks' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];
 
@@ -20,8 +24,13 @@ const Sidebar = () => {
     <div className="hidden md:block w-64 h-screen p-4 fixed left-0 top-0">
       <Card className="glass-card h-full p-6">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold gradient-text">SelfMastery</h1>
-          <p className="text-sm text-muted-foreground mt-1">AI-Powered Growth</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold gradient-text">SelfMastery</h1>
+              <p className="text-sm text-muted-foreground mt-1">AI-Powered Growth</p>
+            </div>
+            <ThemeToggle />
+          </div>
         </div>
 
         <div className="space-y-2 mb-8">

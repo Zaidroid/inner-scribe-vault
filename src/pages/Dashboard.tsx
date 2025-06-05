@@ -68,7 +68,7 @@ const Dashboard = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex flex-wrap gap-2 p-1 bg-muted rounded-lg">
+      <div className="flex flex-wrap gap-2 p-1 bg-card/50 rounded-lg border">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -77,7 +77,7 @@ const Dashboard = () => {
               variant={activeTab === tab.id ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setActiveTab(tab.id)}
-              className={activeTab === tab.id ? 'bg-background shadow-sm' : ''}
+              className={activeTab === tab.id ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-accent'}
             >
               <Icon className="h-4 w-4 mr-2" />
               {tab.label}
