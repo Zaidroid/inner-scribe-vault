@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { User, Calendar, List, Settings, Plus, DollarSign } from 'lucide-react';
 import { Kanban } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
+import UserMenu from './UserMenu';
 
 const Sidebar = () => {
   const location = useLocation();
@@ -29,7 +30,10 @@ const Sidebar = () => {
               <h1 className="text-2xl font-bold gradient-text">SelfMastery</h1>
               <p className="text-sm text-muted-foreground mt-1">AI-Powered Growth</p>
             </div>
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <UserMenu />
+            </div>
           </div>
         </div>
 
@@ -56,7 +60,7 @@ const Sidebar = () => {
 
         <div className="mt-auto pt-8">
           <div className="text-xs text-muted-foreground">
-            <p>Data stored locally</p>
+            <p>Data stored securely</p>
             <p className="text-green-400 mt-1">🔒 Encrypted & Private</p>
           </div>
         </div>

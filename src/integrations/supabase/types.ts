@@ -292,6 +292,8 @@ export type Database = {
           experience_points: number | null
           full_name: string | null
           id: string
+          is_active: boolean | null
+          last_login: string | null
           level: number | null
           streak_days: number | null
           total_tasks_completed: number | null
@@ -306,6 +308,8 @@ export type Database = {
           experience_points?: number | null
           full_name?: string | null
           id: string
+          is_active?: boolean | null
+          last_login?: string | null
           level?: number | null
           streak_days?: number | null
           total_tasks_completed?: number | null
@@ -320,6 +324,8 @@ export type Database = {
           experience_points?: number | null
           full_name?: string | null
           id?: string
+          is_active?: boolean | null
+          last_login?: string | null
           level?: number | null
           streak_days?: number | null
           total_tasks_completed?: number | null

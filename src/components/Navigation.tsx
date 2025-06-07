@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { User, Calendar, List, Settings, DollarSign } from 'lucide-react';
 import { Kanban } from 'lucide-react';
+import UserMenu from './UserMenu';
 
 const Navigation = () => {
   const location = useLocation();
@@ -21,7 +22,7 @@ const Navigation = () => {
 
   return (
     <Card className="glass-card fixed bottom-4 left-1/2 transform -translate-x-1/2 p-2 z-50 md:hidden">
-      <div className="flex space-x-1">
+      <div className="flex items-center space-x-1">
         {navItems.map((item) => (
           <Button
             key={item.path}
@@ -34,6 +35,9 @@ const Navigation = () => {
             <span className="text-[10px] leading-none">{item.label}</span>
           </Button>
         ))}
+        <div className="ml-2">
+          <UserMenu />
+        </div>
       </div>
     </Card>
   );
