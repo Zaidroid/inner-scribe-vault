@@ -12,22 +12,46 @@ import TaskForm from '@/components/TaskForm';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 
+interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  status: 'todo' | 'in-progress' | 'review' | 'done';
+  priority: 'low' | 'medium' | 'high';
+  due_date?: string;
+  assignee?: string;
+  dependencies?: string[];
+  points?: number;
+  coins?: number;
+  team_id?: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const Tasks = () => {
   const { tasks, loading, addTask, updateTask, deleteTask } = useSupabaseTasks();
-  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const columns = [
-    { id: 'todo', title: 'To Do', color: 'bg-blue-500' },
-    { id: 'in-progress', title: 'In Progress', color: 'bg-yellow-500' },
-    { id: 'review', title: 'Review', color: 'bg-purple-500' },
-    { id: 'done', title: 'Done', color: 'bg-green-500' },
+    { id: 'todo' as const, title: 'To Do', color: 'bg-blue-500' },
+    { id: 'in-progress' as const, title: 'In Progress', color: 'bg-yellow-500' },
+    { id: 'review' as const, title: 'Review', color: 'bg-purple-500' },
+    { id: 'done' as const, title: 'Done', color: 'bg-green-500' },
   ];
 
   const handleDragEnd = (taskId: string, newStatus: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
+
+    // Validate status
+    const validStatuses: Task['status'][] = ['todo', 'in-progress', 'review', 'done'];
+    if (!validStatuses.includes(newStatus as Task['status'])) {
+      console.error('Invalid status:', newStatus);
+      return;
+    }
 
     // Check dependencies before allowing move to "done"
     if (newStatus === 'done' && task.dependencies && task.dependencies.length > 0) {
@@ -42,15 +66,15 @@ const Tasks = () => {
       }
     }
 
-    updateTask(taskId, { status: newStatus });
+    updateTask(taskId, { status: newStatus as Task['status'] });
   };
 
-  const handleTaskClick = (task: any) => {
+  const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
     setIsEditModalOpen(true);
   };
 
-  const handleEditSave = (taskId: string, updates: any) => {
+  const handleEditSave = (taskId: string, updates: Partial<Task>) => {
     updateTask(taskId, updates);
     setIsEditModalOpen(false);
     setSelectedTask(null);

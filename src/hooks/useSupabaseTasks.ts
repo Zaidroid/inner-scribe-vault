@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { Tables } from '@/integrations/supabase/types';
 
 interface Task {
   id: string;
@@ -19,6 +20,28 @@ interface Task {
   created_at: string;
   updated_at: string;
 }
+
+type SupabaseTask = Tables<'tasks'>;
+
+// Helper function to convert Supabase task to our Task type
+const convertSupabaseTask = (supabaseTask: SupabaseTask): Task => {
+  return {
+    id: supabaseTask.id,
+    title: supabaseTask.title,
+    description: supabaseTask.description || undefined,
+    status: (supabaseTask.status as Task['status']) || 'todo',
+    priority: (supabaseTask.priority as Task['priority']) || 'medium',
+    due_date: supabaseTask.due_date || undefined,
+    assignee: supabaseTask.assignee || undefined,
+    dependencies: supabaseTask.dependencies || [],
+    points: supabaseTask.points || 5,
+    coins: supabaseTask.coins || 2,
+    team_id: supabaseTask.team_id || undefined,
+    user_id: supabaseTask.user_id,
+    created_at: supabaseTask.created_at || new Date().toISOString(),
+    updated_at: supabaseTask.updated_at || new Date().toISOString(),
+  };
+};
 
 export const useSupabaseTasks = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -43,7 +66,8 @@ export const useSupabaseTasks = () => {
         return;
       }
 
-      setTasks(data || []);
+      const convertedTasks = (data || []).map(convertSupabaseTask);
+      setTasks(convertedTasks);
     } catch (error) {
       console.error('Error loading tasks:', error);
       toast({
@@ -72,11 +96,17 @@ export const useSupabaseTasks = () => {
       const { data, error } = await supabase
         .from('tasks')
         .insert([{
-          ...taskData,
-          user_id: user.id,
+          title: taskData.title,
+          description: taskData.description || null,
+          status: taskData.status,
+          priority: taskData.priority,
+          due_date: taskData.due_date || null,
+          assignee: taskData.assignee || null,
           dependencies: taskData.dependencies || [],
           points: taskData.points || 5,
           coins: taskData.coins || 2,
+          team_id: taskData.team_id || null,
+          user_id: user.id,
         }])
         .select()
         .single();
@@ -91,7 +121,8 @@ export const useSupabaseTasks = () => {
         return;
       }
 
-      setTasks(prev => [data, ...prev]);
+      const convertedTask = convertSupabaseTask(data);
+      setTasks(prev => [convertedTask, ...prev]);
       toast({
         title: "Success",
         description: "Task created successfully!",
@@ -111,7 +142,16 @@ export const useSupabaseTasks = () => {
       const { data, error } = await supabase
         .from('tasks')
         .update({
-          ...updates,
+          title: updates.title,
+          description: updates.description || null,
+          status: updates.status,
+          priority: updates.priority,
+          due_date: updates.due_date || null,
+          assignee: updates.assignee || null,
+          dependencies: updates.dependencies || [],
+          points: updates.points,
+          coins: updates.coins,
+          team_id: updates.team_id || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
@@ -128,8 +168,9 @@ export const useSupabaseTasks = () => {
         return;
       }
 
+      const convertedTask = convertSupabaseTask(data);
       setTasks(prev => prev.map(task => 
-        task.id === id ? { ...task, ...data } : task
+        task.id === id ? convertedTask : task
       ));
       
       toast({
