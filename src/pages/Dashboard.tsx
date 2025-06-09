@@ -52,20 +52,20 @@ const Dashboard = () => {
             <StatsCard
               title="Tasks Completed"
               value={profile?.total_tasks_completed || 0}
-              icon={<Target className="h-6 w-6" />}
-              trend={{ value: 12, isPositive: true }}
+              icon={Target}
+              trend="+12% from last week"
             />
             <StatsCard
               title="Experience Points"
               value={profile?.experience_points || 0}
-              icon={<BarChart3 className="h-6 w-6" />}
-              trend={{ value: 8, isPositive: true }}
+              icon={BarChart3}
+              trend="+8% from last week"
             />
             <StatsCard
               title="Current Streak"
               value={profile?.streak_days || 0}
-              icon={<Target className="h-6 w-6" />}
-              trend={{ value: 3, isPositive: true }}
+              icon={Target}
+              trend="+3 days this week"
             />
           </div>
         );
