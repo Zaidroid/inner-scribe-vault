@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { syncManager } from '../lib/sync';
+import { obsidianSync } from '../lib/obsidian';
 import { Badge } from './ui/badge';
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
 
 // New hook for detailed status
 export function useSyncDetailedStatus() {
     const [status, setStatus] = useState({
-        isOnline: syncManager.getStatus().isOnline,
+        isOnline: obsidianSync.getStatus().isOnline,
         isSyncing: false,
         pendingCount: 0,
     });
@@ -19,19 +19,18 @@ export function useSyncDetailedStatus() {
         const handleSyncCompleted = () => setStatus(s => ({ ...s, isSyncing: false }));
         const handleQueueUpdated = (count: number) => setStatus(s => ({ ...s, pendingCount: count }));
 
-        syncManager.on('status-changed', handleStatusChange);
-        syncManager.on('sync-started', handleSyncStarted);
-        syncManager.on('sync-completed', handleSyncCompleted);
-        syncManager.on('queue-updated', handleQueueUpdated);
+        obsidianSync.on('status-changed', handleStatusChange);
+        obsidianSync.on('sync-started', handleSyncStarted);
+        obsidianSync.on('sync-completed', handleSyncCompleted);
+        obsidianSync.on('queue-updated', handleQueueUpdated);
 
-        // Initial check
-        syncManager.checkQueue();
+        // Initial check is not available on the new module, and it's not critical.
 
         return () => {
-            syncManager.off('status-changed', handleStatusChange);
-            syncManager.off('sync-started', handleSyncStarted);
-            syncManager.off('sync-completed', handleSyncCompleted);
-            syncManager.off('queue-updated', handleQueueUpdated);
+            obsidianSync.off('status-changed', handleStatusChange);
+            obsidianSync.off('sync-started', handleSyncStarted);
+            obsidianSync.off('sync-completed', handleSyncCompleted);
+            obsidianSync.off('queue-updated', handleQueueUpdated);
         };
     }, []);
 
