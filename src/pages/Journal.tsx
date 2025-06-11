@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import { useJournal } from '@/hooks/useDatabase';
 import { useToast } from '@/hooks/use-toast';
 import { Search, Calendar, BookOpen, Plus, Trash2 } from 'lucide-react';
+import { useHotkeys } from '@/hooks/useHotkeys';
 
 const Journal = () => {
   const [showForm, setShowForm] = useState(false);
@@ -18,6 +18,17 @@ const Journal = () => {
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const { entries, loading, addEntry, deleteEntry } = useJournal();
   const { toast } = useToast();
+
+  const hotkeys = {
+    'Cmd+N': useCallback(() => setShowForm(true), []),
+    'Ctrl+N': useCallback(() => setShowForm(true), []),
+    'Escape': useCallback(() => {
+      if (showForm) {
+        setShowForm(false);
+      }
+    }, [showForm]),
+  };
+  useHotkeys(hotkeys);
 
   const handleSaveEntry = async (entry: any) => {
     try {
@@ -52,6 +63,19 @@ const Journal = () => {
           variant: "destructive",
         });
       }
+    }
+  };
+
+  const handleNavigateEntry = (direction: 'next' | 'prev') => {
+    if (!selectedEntry) return;
+
+    const currentIndex = entries.findIndex(e => e.id === selectedEntry.id);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+
+    if (newIndex >= 0 && newIndex < entries.length) {
+      setSelectedEntry(entries[newIndex]);
     }
   };
 
@@ -199,68 +223,82 @@ const Journal = () => {
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Entry Details</h3>
           
-          {selectedEntry ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Card className="glass-card p-6">
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <h2 className="text-xl font-semibold">{selectedEntry.title}</h2>
-                    <div className="flex gap-2">
-                      <ExportButton entry={selectedEntry} />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteEntry(selectedEntry.id)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      {new Date(selectedEntry.date).toLocaleDateString()}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className={`h-3 w-3 rounded-full ${getMoodColor(selectedEntry.mood)}`} />
-                      {selectedEntry.mood}
-                    </div>
-                  </div>
-
-                  <div className="prose prose-sm max-w-none">
-                    <p className="whitespace-pre-wrap">{selectedEntry.content}</p>
-                  </div>
-
-                  {selectedEntry.tags.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">Tags</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedEntry.tags.map((tag: string) => (
-                          <Badge key={tag} variant="secondary">
-                            {tag}
-                          </Badge>
-                        ))}
+          <AnimatePresence initial={false}>
+            {selectedEntry ? (
+              <motion.div
+                key={selectedEntry.id}
+                initial={{ opacity: 0, x: 300 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -300 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                onDragEnd={(event, info) => {
+                  const offset = info.offset.x;
+                  if (offset > 100) {
+                    handleNavigateEntry('prev');
+                  } else if (offset < -100) {
+                    handleNavigateEntry('next');
+                  }
+                }}
+              >
+                <Card className="glass-card p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between">
+                      <h2 className="text-xl font-semibold">{selectedEntry.title}</h2>
+                      <div className="flex gap-2">
+                        <ExportButton entry={selectedEntry} />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteEntry(selectedEntry.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                  )}
-                </div>
+                    
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        {new Date(selectedEntry.date).toLocaleDateString()}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={`h-3 w-3 rounded-full ${getMoodColor(selectedEntry.mood)}`} />
+                        {selectedEntry.mood}
+                      </div>
+                    </div>
+
+                    <div className="prose prose-sm max-w-none">
+                      <p className="whitespace-pre-wrap">{selectedEntry.content}</p>
+                    </div>
+
+                    {selectedEntry.tags.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Tags</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedEntry.tags.map((tag: string) => (
+                            <Badge key={tag} variant="secondary">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </motion.div>
+            ) : (
+              <Card className="glass-card p-8 text-center">
+                <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">Select an Entry</h3>
+                <p className="text-muted-foreground">
+                  Choose an entry from the list to view its details.
+                </p>
               </Card>
-            </motion.div>
-          ) : (
-            <Card className="glass-card p-8 text-center">
-              <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">Select an Entry</h3>
-              <p className="text-muted-foreground">
-                Choose an entry from the list to view its details.
-              </p>
-            </Card>
-          )}
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </motion.div>

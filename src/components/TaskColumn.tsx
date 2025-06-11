@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
@@ -17,9 +16,10 @@ interface TaskColumnProps {
   onUpdateTask: (taskId: string, updates: any) => void;
   onDeleteTask: (taskId: string) => void;
   onTaskClick?: (task: any) => void;
+  isLoading: boolean;
 }
 
-const TaskColumn = ({ column, tasks, onDragEnd, onUpdateTask, onDeleteTask, onTaskClick }: TaskColumnProps) => {
+const TaskColumn = ({ column, tasks, onDragEnd, onUpdateTask, onDeleteTask, onTaskClick, isLoading }: TaskColumnProps) => {
   const [draggedOver, setDraggedOver] = useState(false);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -71,82 +71,85 @@ const TaskColumn = ({ column, tasks, onDragEnd, onUpdateTask, onDeleteTask, onTa
       </div>
 
       <div className="space-y-3">
-        {tasks.map((task, index) => (
-          <motion.div
-            key={task.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <Card 
-              className="p-4 bg-card/60 border hover:bg-card/80 transition-colors cursor-move"
-              draggable
-              onDragStart={(e) => handleDragStart(e, task.id)}
-              onClick={() => onTaskClick?.(task)}
-            >
-              <div className="space-y-3">
-                <div className="flex items-start justify-between">
-                  <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteTask(task.id);
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-
-                {task.description && (
-                  <p className="text-xs text-muted-foreground">{task.description}</p>
-                )}
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
-                    <span className="text-xs capitalize">{task.priority}</span>
-                  </div>
-
-                  {task.dueDate && (
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(task.dueDate).toLocaleDateString()}
-                      </span>
+        {isLoading ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <p className="text-sm">Loading tasks...</p>
+          </div>
+        ) : tasks.length > 0 ? (
+          tasks.map((task, index) => (
+            <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task.id)}>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05, type: 'spring', stiffness: 300, damping: 30 }}
+              >
+                <Card 
+                  className="p-4 bg-card/60 border hover:bg-card/80 transition-colors cursor-pointer"
+                  onClick={() => onTaskClick?.(task)}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteTask(task.id);
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
-                  )}
-                </div>
 
-                {task.dependencies && task.dependencies.length > 0 && (
-                  <div className="flex items-center gap-1">
-                    <Link className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">
-                      {task.dependencies.length} dependencies
-                    </span>
-                  </div>
-                )}
+                    {task.description && (
+                      <p className="text-xs text-muted-foreground">{task.description}</p>
+                    )}
 
-                {task.assignee && (
-                  <div className="flex items-center gap-1">
-                    <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
-                      <span className="text-xs font-medium">
-                        {task.assignee.charAt(0).toUpperCase()}
-                      </span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
+                        <span className="text-xs capitalize">{task.priority}</span>
+                      </div>
+
+                      {task.dueDate && (
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(task.dueDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <span className="text-xs">{task.assignee}</span>
-                  </div>
-                )}
-              </div>
-            </Card>
-          </motion.div>
-        ))}
 
-        {tasks.length === 0 && (
+                    {task.dependencies && task.dependencies.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Link className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">
+                          {task.dependencies.length} dependencies
+                        </span>
+                      </div>
+                    )}
+
+                    {task.assignee && (
+                      <div className="flex items-center gap-1">
+                        <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+                          <span className="text-xs font-medium">
+                            {task.assignee.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="text-xs">{task.assignee}</span>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </motion.div>
+            </div>
+          ))
+        ) : (
           <div className="text-center py-8 text-muted-foreground">
             <p className="text-sm">No tasks in {column.title.toLowerCase()}</p>
           </div>

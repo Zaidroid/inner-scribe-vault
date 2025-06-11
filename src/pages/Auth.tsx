@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -8,26 +7,43 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
-import { User, Mail, Lock, UserPlus } from 'lucide-react';
+import { User, Mail, Lock, UserPlus, ShieldCheck } from 'lucide-react';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [challengeId, setChallengeId] = useState<string | undefined>(undefined);
+  const [otpCode, setOtpCode] = useState('');
+  const { signIn, signUp, verifyAndSignIn } = useAuth();
   const navigate = useNavigate();
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    const { error } = await signIn(email, password);
+    const { error, requires2FA: r2fa, challengeId: cId } = await signIn(email, password);
     
-    if (!error) {
+    if (r2fa && cId) {
+      setRequires2FA(true);
+      setChallengeId(cId);
+    } else if (!error) {
       navigate('/');
     }
     
+    setLoading(false);
+  };
+
+  const handleVerifySignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!challengeId) return;
+    setLoading(true);
+    const { error } = await verifyAndSignIn(challengeId, otpCode);
+    if (!error) {
+      navigate('/');
+    }
     setLoading(false);
   };
 
@@ -60,47 +76,74 @@ const Auth = () => {
             </TabsList>
 
             <TabsContent value="signin" className="space-y-4 mt-6">
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signin-email">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signin-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
+              {!requires2FA ? (
+                <form onSubmit={handleSignIn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="signin-email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="signin-password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signin-password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-password">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="signin-password"
+                        type="password"
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-primary"
-                  disabled={loading}
-                >
-                  {loading ? 'Signing in...' : 'Sign In'}
-                </Button>
-              </form>
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-gradient-primary"
+                    disabled={loading}
+                  >
+                    {loading ? 'Signing in...' : 'Sign In'}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifySignIn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="otp-code">Two-Factor Code</Label>
+                    <div className="relative">
+                      <ShieldCheck className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="otp-code"
+                        type="text"
+                        placeholder="Enter your 6-digit code"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-gradient-primary"
+                    disabled={loading}
+                  >
+                    {loading ? 'Verifying...' : 'Verify & Sign In'}
+                  </Button>
+                </form>
+              )}
             </TabsContent>
 
             <TabsContent value="signup" className="space-y-4 mt-6">

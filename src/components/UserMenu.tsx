@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,6 +8,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { LazyAvatarImage } from '@/components/ui/lazy-avatar-image';
 import { useAuth } from '@/hooks/useAuth';
 import { LogOut, Settings, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -39,6 +39,11 @@ const UserMenu = () => {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-10 w-10 rounded-full p-0">
           <Avatar className="h-10 w-10">
+            <LazyAvatarImage 
+              src={user.user_metadata?.avatar_url} 
+              alt={user.user_metadata?.full_name || 'User Avatar'} 
+              style={{ objectFit: 'cover' }}
+            />
             <AvatarFallback className="bg-gradient-primary text-white">
               {initials}
             </AvatarFallback>

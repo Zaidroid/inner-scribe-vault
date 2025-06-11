@@ -1,4 +1,5 @@
 import { encrypt, decrypt } from './encryption';
+import { syncManager } from './sync';
 
 interface JournalEntry {
   id: string;
@@ -79,10 +80,18 @@ interface Task {
   updatedAt: string;
 }
 
+interface Mutation {
+  id: number;
+  type: string;
+  payload: any;
+  timestamp: number;
+  retries: number;
+}
+
 class Database {
   private db: IDBDatabase | null = null;
   private readonly DB_NAME = 'SelfMasteryDB';
-  private readonly DB_VERSION = 3; // Incremented for finance and tasks support
+  private readonly DB_VERSION = 5; // Incremented for dead-letter queue
 
   async init(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -130,183 +139,209 @@ class Database {
         if (!db.objectStoreNames.contains('tasks')) {
           db.createObjectStore('tasks', { keyPath: 'id' });
         }
+
+        // Add new store for offline mutations
+        if (!db.objectStoreNames.contains('mutations')) {
+          const store = db.createObjectStore('mutations', { keyPath: 'id', autoIncrement: true });
+          store.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+        
+        // Add new store for "dead" mutations
+        if (!db.objectStoreNames.contains('dead_mutations')) {
+          db.createObjectStore('dead_mutations', { keyPath: 'id', autoIncrement: true });
+        }
       };
     });
   }
 
   // Journal methods
   async saveJournalEntry(entry: JournalEntry): Promise<void> {
-    if (!this.db) await this.init();
-
-    const encryptedEntry = {
-      ...entry,
-      title: encrypt(entry.title),
-      content: encrypt(entry.content),
-      tags: entry.tags.map(tag => encrypt(tag)),
-    };
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['journal_entries'], 'readwrite');
-      const store = transaction.objectStore('journal_entries');
-      const request = store.put(encryptedEntry);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      const encryptedEntry = {
+        ...entry,
+        title: await encrypt(entry.title),
+        content: await encrypt(entry.content),
+        tags: await Promise.all(entry.tags.map(tag => encrypt(tag))),
+      };
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['journal_entries'], 'readwrite');
+        const store = transaction.objectStore('journal_entries');
+        const request = store.put(encryptedEntry);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'saveJournalEntry', payload: entry });
+    }
   }
 
   async getJournalEntries(): Promise<JournalEntry[]> {
-    if (!this.db) await this.init();
+    const entries = await this.getRawJournalEntries();
+    return Promise.all(entries.map(async (entry: any) => ({
+      ...entry,
+      title: await decrypt(entry.title),
+      content: await decrypt(entry.content),
+      tags: await Promise.all(entry.tags.map((tag: string) => decrypt(tag))),
+    })));
+  }
 
+  async getRawJournalEntries(): Promise<any[]> {
+    if (!this.db) await this.init();
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['journal_entries'], 'readonly');
       const store = transaction.objectStore('journal_entries');
       const request = store.getAll();
-
       request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const entries = request.result.map((entry: any) => ({
-          ...entry,
-          title: decrypt(entry.title),
-          content: decrypt(entry.content),
-          tags: entry.tags.map((tag: string) => decrypt(tag)),
-        }));
-        resolve(entries);
-      };
+      request.onsuccess = () => resolve(request.result);
     });
   }
 
   async deleteJournalEntry(id: string): Promise<void> {
-    if (!this.db) await this.init();
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['journal_entries'], 'readwrite');
+        const store = transaction.objectStore('journal_entries');
+        const request = store.delete(id);
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['journal_entries'], 'readwrite');
-      const store = transaction.objectStore('journal_entries');
-      const request = store.delete(id);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'deleteJournalEntry', payload: { id } });
+    }
   }
 
   // Habit methods
   async saveHabit(habit: Habit): Promise<void> {
-    if (!this.db) await this.init();
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      const encryptedHabit = {
+        ...habit,
+        name: await encrypt(habit.name),
+        description: await encrypt(habit.description),
+      };
 
-    const encryptedHabit = {
-      ...habit,
-      name: encrypt(habit.name),
-      description: encrypt(habit.description),
-    };
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['habits'], 'readwrite');
+        const store = transaction.objectStore('habits');
+        const request = store.put(encryptedHabit);
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['habits'], 'readwrite');
-      const store = transaction.objectStore('habits');
-      const request = store.put(encryptedHabit);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'saveHabit', payload: habit });
+    }
   }
 
   async getHabits(): Promise<Habit[]> {
-    if (!this.db) await this.init();
+    const habits = await this.getRawHabits();
+    return Promise.all(habits.map(async (habit: any) => ({
+        ...habit,
+        name: await decrypt(habit.name),
+        description: await decrypt(habit.description),
+    })));
+  }
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['habits'], 'readonly');
-      const store = transaction.objectStore('habits');
-      const request = store.getAll();
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const habits = request.result.map((habit: any) => ({
-          ...habit,
-          name: decrypt(habit.name),
-          description: decrypt(habit.description),
-        }));
-        resolve(habits);
-      };
-    });
+  async getRawHabits(): Promise<any[]> {
+      if (!this.db) await this.init();
+      return new Promise((resolve, reject) => {
+          const transaction = this.db!.transaction(['habits'], 'readonly');
+          const store = transaction.objectStore('habits');
+          const request = store.getAll();
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => resolve(request.result);
+      });
   }
 
   async deleteHabit(id: string): Promise<void> {
-    if (!this.db) await this.init();
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['habits'], 'readwrite');
+        const store = transaction.objectStore('habits');
+        const request = store.delete(id);
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['habits'], 'readwrite');
-      const store = transaction.objectStore('habits');
-      const request = store.delete(id);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'deleteHabit', payload: { id } });
+    }
   }
 
   // Goal methods
   async saveGoal(goal: Goal): Promise<void> {
-    if (!this.db) await this.init();
-    
-    const encryptedGoal = {
-      ...goal,
-      title: encrypt(goal.title),
-      description: encrypt(goal.description),
-    };
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      const encryptedGoal = {
+        ...goal,
+        title: await encrypt(goal.title),
+        description: await encrypt(goal.description),
+      };
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['goals'], 'readwrite');
-      const store = transaction.objectStore('goals');
-      const request = store.put(encryptedGoal);
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['goals'], 'readwrite');
+        const store = transaction.objectStore('goals');
+        const request = store.put(encryptedGoal);
 
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'saveGoal', payload: goal });
+    }
   }
 
   async getGoals(): Promise<Goal[]> {
-    if (!this.db) await this.init();
+    const goals = await this.getRawGoals();
+    return Promise.all(goals.map(async g => ({...g, title: await decrypt(g.title), description: await decrypt(g.description)})));
+  }
 
+  async getRawGoals(): Promise<any[]> {
+    if (!this.db) await this.init();
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['goals'], 'readonly');
       const store = transaction.objectStore('goals');
       const request = store.getAll();
-
       request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const goals = request.result.map((goal: any) => ({
-          ...goal,
-          title: decrypt(goal.title),
-          description: decrypt(goal.description),
-        }));
-        resolve(goals);
-      };
+      request.onsuccess = () => resolve(request.result);
     });
   }
 
   async deleteGoal(id: string): Promise<void> {
-    if (!this.db) await this.init();
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['goals'], 'readwrite');
+        const store = transaction.objectStore('goals');
+        const request = store.delete(id);
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['goals'], 'readwrite');
-      const store = transaction.objectStore('goals');
-      const request = store.delete(id);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'deleteGoal', payload: { id } });
+    }
   }
 
   // Settings methods
   async saveSetting(key: string, value: any): Promise<void> {
-    if (!this.db) await this.init();
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['settings'], 'readwrite');
+        const store = transaction.objectStore('settings');
+        const request = store.put({ key, value });
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['settings'], 'readwrite');
-      const store = transaction.objectStore('settings');
-      const request = store.put({ key, value });
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'saveSetting', payload: { key, value } });
+    }
   }
 
   async getSetting(key: string): Promise<any> {
@@ -327,208 +362,231 @@ class Database {
 
   // Transaction methods
   async saveTransaction(transaction: any): Promise<void> {
-    if (!this.db) await this.init();
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      const encryptedTransaction = {
+        ...transaction,
+        description: await encrypt(transaction.description),
+      };
 
-    const encryptedTransaction = {
-      ...transaction,
-      description: encrypt(transaction.description),
-    };
+      return new Promise((resolve, reject) => {
+        const transactionDB = this.db!.transaction(['transactions'], 'readwrite');
+        const store = transactionDB.objectStore('transactions');
+        const request = store.put(encryptedTransaction);
 
-    return new Promise((resolve, reject) => {
-      const transactionDB = this.db!.transaction(['transactions'], 'readwrite');
-      const store = transactionDB.objectStore('transactions');
-      const request = store.put(encryptedTransaction);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'saveTransaction', payload: transaction });
+    }
   }
 
   async getTransactions(): Promise<any[]> {
-    if (!this.db) await this.init();
+    const transactions = await this.getRawTransactions();
+    return Promise.all(transactions.map(async t => ({...t, description: await decrypt(t.description)})));
+  }
 
+  async getRawTransactions(): Promise<any[]> {
+    if (!this.db) await this.init();
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['transactions'], 'readonly');
       const store = transaction.objectStore('transactions');
       const request = store.getAll();
-
       request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const transactions = request.result.map((transaction: any) => ({
-          ...transaction,
-          description: decrypt(transaction.description),
-        }));
-        resolve(transactions);
-      };
+      request.onsuccess = () => resolve(request.result);
     });
   }
 
   async deleteTransaction(id: string): Promise<void> {
-    if (!this.db) await this.init();
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['transactions'], 'readwrite');
+        const store = transaction.objectStore('transactions');
+        const request = store.delete(id);
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['transactions'], 'readwrite');
-      const store = transaction.objectStore('transactions');
-      const request = store.delete(id);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'deleteTransaction', payload: { id } });
+    }
   }
 
   // Budget methods
   async saveBudget(budget: any): Promise<void> {
-    if (!this.db) await this.init();
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      const encryptedBudget = {
+        ...budget,
+        category: await encrypt(budget.category),
+      };
 
-    const encryptedBudget = {
-      ...budget,
-      category: encrypt(budget.category),
-    };
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['budgets'], 'readwrite');
+        const store = transaction.objectStore('budgets');
+        const request = store.put(encryptedBudget);
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['budgets'], 'readwrite');
-      const store = transaction.objectStore('budgets');
-      const request = store.put(encryptedBudget);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'saveBudget', payload: budget });
+    }
   }
 
   async getBudgets(): Promise<any[]> {
+    const budgets = await this.getRawBudgets();
+    return Promise.all(budgets.map(async b => ({...b, category: await decrypt(b.category)})));
+  }
+
+  async getRawBudgets(): Promise<any[]> {
     if (!this.db) await this.init();
-
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['budgets'], 'readonly');
-      const store = transaction.objectStore('budgets');
-      const request = store.getAll();
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const budgets = request.result.map((budget: any) => ({
-          ...budget,
-          category: decrypt(budget.category),
-        }));
-        resolve(budgets);
-      };
+        const transaction = this.db!.transaction(['budgets'], 'readonly');
+        const store = transaction.objectStore('budgets');
+        const request = store.getAll();
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
     });
   }
 
   // Financial Goal methods
   async saveFinancialGoal(goal: any): Promise<void> {
-    if (!this.db) await this.init();
-    
-    const encryptedGoal = {
-      ...goal,
-      title: encrypt(goal.title),
-    };
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      const encryptedGoal = {
+        ...goal,
+        title: await encrypt(goal.title),
+      };
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['financial_goals'], 'readwrite');
-      const store = transaction.objectStore('financial_goals');
-      const request = store.put(encryptedGoal);
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['financial_goals'], 'readwrite');
+        const store = transaction.objectStore('financial_goals');
+        const request = store.put(encryptedGoal);
 
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'saveFinancialGoal', payload: goal });
+    }
   }
 
   async getFinancialGoals(): Promise<any[]> {
+    const goals = await this.getRawFinancialGoals();
+    return Promise.all(goals.map(async g => ({...g, title: await decrypt(g.title)})));
+  }
+
+  async getRawFinancialGoals(): Promise<any[]> {
     if (!this.db) await this.init();
-
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['financial_goals'], 'readonly');
-      const store = transaction.objectStore('financial_goals');
-      const request = store.getAll();
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const goals = request.result.map((goal: any) => ({
-          ...goal,
-          title: decrypt(goal.title),
-        }));
-        resolve(goals);
-      };
+        const transaction = this.db!.transaction(['financial_goals'], 'readonly');
+        const store = transaction.objectStore('financial_goals');
+        const request = store.getAll();
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
     });
   }
 
   // Task methods
   async saveTask(task: any): Promise<void> {
-    if (!this.db) await this.init();
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      const encryptedTask = {
+        ...task,
+        title: await encrypt(task.title),
+        description: await encrypt(task.description || ''),
+      };
 
-    const encryptedTask = {
-      ...task,
-      title: encrypt(task.title),
-      description: encrypt(task.description || ''),
-    };
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['tasks'], 'readwrite');
+        const store = transaction.objectStore('tasks');
+        const request = store.put(encryptedTask);
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['tasks'], 'readwrite');
-      const store = transaction.objectStore('tasks');
-      const request = store.put(encryptedTask);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'saveTask', payload: task });
+    }
   }
 
   async getTasks(): Promise<any[]> {
+    const tasks = await this.getRawTasks();
+    return Promise.all(tasks.map(async t => ({...t, title: await decrypt(t.title), description: await decrypt(t.description)})));
+  }
+
+  async getRawTasks(): Promise<any[]> {
     if (!this.db) await this.init();
-
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['tasks'], 'readonly');
-      const store = transaction.objectStore('tasks');
-      const request = store.getAll();
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const tasks = request.result.map((task: any) => ({
-          ...task,
-          title: decrypt(task.title),
-          description: decrypt(task.description || ''),
-        }));
-        resolve(tasks);
-      };
+        const transaction = this.db!.transaction(['tasks'], 'readonly');
+        const store = transaction.objectStore('tasks');
+        const request = store.getAll();
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
     });
   }
 
   async deleteTask(id: string): Promise<void> {
-    if (!this.db) await this.init();
+    if (syncManager.getStatus().isOnline) {
+      if (!this.db) await this.init();
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['tasks'], 'readwrite');
+        const store = transaction.objectStore('tasks');
+        const request = store.delete(id);
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['tasks'], 'readwrite');
-      const store = transaction.objectStore('tasks');
-      const request = store.delete(id);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+      });
+    } else {
+      await this.addMutation({ type: 'deleteTask', payload: { id } });
+    }
   }
 
   async exportData(): Promise<any> {
-    const [journals, habits, goals, settings, transactions, budgets, financialGoals, tasks] = await Promise.all([
-      this.getJournalEntries(),
-      this.getHabits(),
-      this.getGoals(),
-      this.getAllSettings(),
-      this.getTransactions(),
-      this.getBudgets(),
-      this.getFinancialGoals(),
-      this.getTasks(),
-    ]);
+    if (!this.db) await this.init();
+    const stores = ['journal_entries', 'habits', 'goals', 'transactions', 'budgets', 'financial_goals', 'tasks', 'settings'];
+    const data: { [key: string]: any[] } = {};
 
-    return {
-      version: '1.0',
-      exportDate: new Date().toISOString(),
-      journals,
-      habits,
-      goals,
-      settings,
-      transactions,
-      budgets,
-      financialGoals,
-      tasks,
-    };
+    return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(stores, 'readonly');
+        transaction.onerror = () => reject(transaction.error);
+        
+        let completed = 0;
+        stores.forEach(storeName => {
+            const store = transaction.objectStore(storeName);
+            const request = store.getAll();
+            request.onsuccess = () => {
+                data[storeName] = request.result;
+                completed++;
+                if (completed === stores.length) {
+                    resolve(data);
+                }
+            };
+        });
+    });
+  }
+
+  async importData(data: { [key: string]: any[] }): Promise<void> {
+    if (!this.db) await this.init();
+    await this.clearAllData(); // Clear old data before import
+    
+    const stores = Object.keys(data);
+
+    return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(stores, 'readwrite');
+        transaction.onerror = () => reject(transaction.error);
+        transaction.oncomplete = () => resolve();
+
+        stores.forEach(storeName => {
+            const store = transaction.objectStore(storeName);
+            data[storeName].forEach(item => {
+                store.put(item);
+            });
+        });
+    });
   }
 
   async clearAllData(): Promise<void> {
@@ -574,6 +632,133 @@ class Database {
       request.onsuccess = () => {
         resolve(request.result);
       };
+    });
+  }
+
+  // Method to add a mutation to the queue
+  async addMutation(mutation: Omit<Mutation, 'id' | 'timestamp' | 'retries'>): Promise<void> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['mutations'], 'readwrite');
+      const store = transaction.objectStore('mutations');
+      const request = store.add({ ...mutation, timestamp: Date.now(), retries: 0 });
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+  }
+
+  // Method to get all mutations from the queue
+  async getMutations(): Promise<Mutation[]> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['mutations'], 'readonly');
+      const store = transaction.objectStore('mutations');
+      const request = store.getAll();
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+  }
+
+  // Method to delete a mutation from the queue
+  async deleteMutation(id: number): Promise<void> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['mutations'], 'readwrite');
+      const store = transaction.objectStore('mutations');
+      const request = store.delete(id);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+  }
+
+  // New method to update a mutation's retry count
+  async updateMutationRetries(id: number, retries: number): Promise<void> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['mutations'], 'readwrite');
+      const store = transaction.objectStore('mutations');
+      const getRequest = store.get(id);
+      getRequest.onsuccess = () => {
+        const mutation = getRequest.result;
+        if (mutation) {
+          mutation.retries = retries;
+          const putRequest = store.put(mutation);
+          putRequest.onsuccess = () => resolve();
+          putRequest.onerror = () => reject(putRequest.error);
+        } else {
+          reject(new Error(`Mutation with id ${id} not found.`));
+        }
+      };
+      getRequest.onerror = () => reject(getRequest.error);
+    });
+  }
+  
+  // New method to move a mutation to the dead-letter queue
+  async moveToDeadLetterQueue(mutation: Mutation): Promise<void> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['mutations', 'dead_mutations'], 'readwrite');
+        const mutationsStore = transaction.objectStore('mutations');
+        const deadStore = transaction.objectStore('dead_mutations');
+
+        const deleteRequest = mutationsStore.delete(mutation.id);
+        deleteRequest.onerror = () => reject(deleteRequest.error);
+
+        const addRequest = deadStore.add(mutation);
+        addRequest.onerror = () => reject(addRequest.error);
+
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+  }
+  
+  // New method to get all dead mutations
+  async getDeadLetterMutations(): Promise<Mutation[]> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['dead_mutations'], 'readonly');
+        const store = transaction.objectStore('dead_mutations');
+        const request = store.getAll();
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+    });
+  }
+
+  async retryDeadMutation(mutation: Mutation): Promise<void> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['mutations', 'dead_mutations'], 'readwrite');
+        const mutationsStore = transaction.objectStore('mutations');
+        const deadStore = transaction.objectStore('dead_mutations');
+
+        const deleteRequest = deadStore.delete(mutation.id);
+        deleteRequest.onerror = () => reject(deleteRequest.error);
+
+        // Reset retries and add back to main queue
+        mutation.retries = 0;
+        // The 'id' is part of the mutation object, so we don't need to worry about auto-increment
+        const addRequest = mutationsStore.add(mutation);
+        addRequest.onerror = () => reject(addRequest.error);
+
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+  }
+
+  async deleteDeadMutation(id: number): Promise<void> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['dead_mutations'], 'readwrite');
+        const store = transaction.objectStore('dead_mutations');
+        const request = store.delete(id);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
     });
   }
 }

@@ -10,6 +10,13 @@ import { obsidianSync } from '@/lib/obsidian';
 import { useToast } from '@/hooks/use-toast';
 import { Settings as SettingsIcon, Calendar, List, Download, Upload, Trash2 } from 'lucide-react';
 import AIProviderConfig from '@/components/AIProviderConfig';
+import { VaultConnection } from '@/components/VaultConnection';
+import { Settings as VaultSettingsComponent } from '@/components/Settings';
+import { SecuritySettings, BackupSettings } from '@/components/SecuritySettings';
+import ProfileSettings from '@/components/ProfileSettings';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { useAuditLog } from '@/hooks/useAuditLog';
+import HelpTooltip from '@/components/HelpTooltip';
 
 const Settings = () => {
   const [obsidianPath, setObsidianPath] = useState('');
@@ -17,6 +24,7 @@ const Settings = () => {
   const [encryptionEnabled, setEncryptionEnabled] = useState(true);
   
   const { toast } = useToast();
+  const { addAuditLog } = useAuditLog();
 
   useEffect(() => {
     loadSettings();
@@ -45,6 +53,7 @@ const Settings = () => {
         enabled: syncEnabled,
       });
 
+      await addAuditLog('obsidian_settings_saved');
       toast({
         title: "Obsidian Settings Saved",
         description: "Your Obsidian integration preferences have been updated.",
@@ -69,6 +78,7 @@ const Settings = () => {
       link.click();
       URL.revokeObjectURL(url);
 
+      await addAuditLog('data_exported');
       toast({
         title: "Data Exported",
         description: "Your data has been downloaded successfully.",
@@ -108,6 +118,7 @@ const Settings = () => {
             await db.saveSetting(setting.key, setting.value);
           }
 
+          await addAuditLog('data_imported', { file_name: file.name });
           toast({
             title: "Data Imported",
             description: "Your data has been restored successfully.",
@@ -128,6 +139,7 @@ const Settings = () => {
     if (confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
       try {
         await db.clearAllData();
+        await addAuditLog('data_cleared');
         toast({
           title: "Data Cleared",
           description: "All data has been permanently deleted.",
@@ -147,12 +159,16 @@ const Settings = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="space-y-6"
+      className="space-y-6 p-4 md:p-6"
     >
       <div>
-        <h1 className="text-3xl font-bold gradient-text">Settings</h1>
+        <h1 className="text-2xl md:text-3xl font-bold gradient-text">Settings</h1>
         <p className="text-muted-foreground mt-1">Configure your SelfMastery experience</p>
       </div>
+
+      <ProfileSettings />
+
+      <LanguageSwitcher />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* AI Configuration */}
@@ -178,7 +194,12 @@ const Settings = () => {
             
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label htmlFor="sync-enabled">Enable Vault Sync</Label>
+                <div className="flex items-center">
+                  <Label htmlFor="sync-enabled">Enable Vault Sync</Label>
+                  <HelpTooltip>
+                    When enabled, your journal entries will be automatically saved as markdown files in your chosen Obsidian vault.
+                  </HelpTooltip>
+                </div>
                 <Switch
                   id="sync-enabled"
                   checked={syncEnabled}
@@ -187,7 +208,12 @@ const Settings = () => {
               </div>
 
               <div>
-                <Label htmlFor="obsidian-path" className="mb-2 block">Vault Path</Label>
+                <div className="flex items-center">
+                  <Label htmlFor="obsidian-path" className="mb-2 block">Vault Path</Label>
+                  <HelpTooltip>
+                    Provide the full path to your local Obsidian vault. The app needs this to read and write files.
+                  </HelpTooltip>
+                </div>
                 <input
                   id="obsidian-path"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -236,7 +262,12 @@ const Settings = () => {
             
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label htmlFor="encryption-enabled">Local Encryption</Label>
+                <div className="flex items-center">
+                  <Label htmlFor="encryption-enabled">Local Encryption</Label>
+                  <HelpTooltip>
+                    Your data is always encrypted at rest on your local device using AES-256. This setting cannot be disabled.
+                  </HelpTooltip>
+                </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="text-green-400">
                     Active
@@ -285,34 +316,49 @@ const Settings = () => {
             
             <div className="space-y-4">
               <div>
-                <Button onClick={handleExportData} variant="outline" className="w-full">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export All Data
-                </Button>
+                <div className="flex items-center justify-between w-full">
+                  <Button onClick={handleExportData} variant="outline" className="flex-grow">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export All Data
+                  </Button>
+                  <HelpTooltip>
+                    Download all your application data into a single, encrypted JSON file. Keep this file safe as a backup.
+                  </HelpTooltip>
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Download your data as encrypted JSON
                 </p>
               </div>
 
               <div>
-                <Button onClick={handleImportData} variant="outline" className="w-full">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Import Data
-                </Button>
+                <div className="flex items-center justify-between w-full">
+                  <Button onClick={handleImportData} variant="outline" className="flex-grow">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Import Data
+                  </Button>
+                  <HelpTooltip>
+                    Restore your data from a previously exported backup file. This will overwrite existing data.
+                  </HelpTooltip>
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Restore from a previous export
                 </p>
               </div>
 
               <div className="pt-4 border-t border-white/10">
-                <Button 
-                  onClick={handleClearData} 
-                  variant="destructive" 
-                  className="w-full"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Clear All Data
-                </Button>
+                <div className="flex items-center justify-between w-full">
+                  <Button 
+                    onClick={handleClearData} 
+                    variant="destructive" 
+                    className="flex-grow"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear All Data
+                  </Button>
+                  <HelpTooltip>
+                    Warning: This will permanently delete all your data from this application. This action cannot be undone.
+                  </HelpTooltip>
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Permanently delete all stored data
                 </p>
@@ -322,13 +368,41 @@ const Settings = () => {
         </motion.div>
       </div>
 
+      {/* New Security Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+        className="space-y-6"
+      >
+        <SecuritySettings />
+        <BackupSettings />
+      </motion.div>
+
+      {/* Advanced Vault Management Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.5 }}
+      >
+        <Card className="glass-card p-4 md:p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            Advanced Vault Management
+          </h3>
+          <div className="space-y-6">
+            <VaultConnection />
+            <VaultSettingsComponent />
+          </div>
+        </Card>
+      </motion.div>
+
       {/* App Information */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.5 }}
       >
-        <Card className="glass-card p-6">
+        <Card className="glass-card p-4 md:p-6">
           <h3 className="text-lg font-semibold mb-4">About SelfMastery</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>

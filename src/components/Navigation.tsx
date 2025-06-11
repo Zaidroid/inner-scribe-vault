@@ -1,9 +1,8 @@
-
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { User, Calendar, List, Settings, DollarSign } from 'lucide-react';
+import { User, Calendar, List, Settings, DollarSign, Users, Zap } from 'lucide-react';
 import { Kanban } from 'lucide-react';
 import { motion } from 'framer-motion';
 import UserMenu from './UserMenu';
@@ -18,6 +17,7 @@ const Navigation = () => {
     { path: '/habits', icon: List, label: 'Habits' },
     { path: '/finance', icon: DollarSign, label: 'Finance' },
     { path: '/tasks', icon: Kanban, label: 'Tasks' },
+    { path: '/activity', icon: Zap, label: 'Activity' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];
 

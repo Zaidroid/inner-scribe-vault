@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useProfile } from '@/hooks/useProfile';
@@ -7,12 +6,17 @@ import DashboardWidget from '@/components/Dashboard/DashboardWidget';
 import WidgetSelector from '@/components/Dashboard/WidgetSelector';
 import StatsCard from '@/components/StatsCard';
 import GoalTracker from '@/components/GoalTracker';
-import TeamInvite from '@/components/Collaboration/TeamInvite';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, Target, Users, Settings, Sparkles, TrendingUp, Calendar, Clock } from 'lucide-react';
+import { BarChart3, Target, Users, Settings, Sparkles, TrendingUp, Calendar, Clock, Plus, ArrowRight } from 'lucide-react';
+import { GoalSuggester } from '@/components/GoalSuggester';
+import { useTeams, Team } from '@/hooks/useTeams';
+import { Link, useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { CreateTeamModal } from '@/components/Collaboration/CreateTeamModal';
+import { useModalStore } from '@/hooks/useModalStore';
 
 interface DashboardWidget {
   id: string;
@@ -48,10 +52,14 @@ const itemVariants = {
 const Dashboard = () => {
   const { profile, loading: profileLoading } = useProfile();
   const { tasks, loading: tasksLoading } = useSupabaseTasks();
+  const { data: teams, isLoading: teamsLoading } = useTeams();
+  const navigate = useNavigate();
   const [widgets, setWidgets] = useState<DashboardWidget[]>([
     { id: 'stats', title: 'Statistics Overview', component: 'StatsOverview', position: { x: 0, y: 0 }, size: { width: 12, height: 4 } },
     { id: 'goals', title: 'Goal Tracker', component: 'GoalTracker', position: { x: 0, y: 4 }, size: { width: 6, height: 6 } },
   ]);
+  const [isCreateTeamModalOpen, setCreateTeamModalOpen] = useState(false);
+  const openModal = useModalStore((state) => state.openModal);
 
   const addWidget = (widget: any) => {
     const newWidget: DashboardWidget = {
@@ -108,7 +116,6 @@ const Dashboard = () => {
             <p className="text-sm text-muted-foreground">
               Connect with team members and collaborate on tasks to achieve your goals together.
             </p>
-            <TeamInvite />
           </div>
         );
       default:
@@ -131,7 +138,11 @@ const Dashboard = () => {
     return { progress, xpForNextLevel };
   };
 
-  if (profileLoading || tasksLoading) {
+  const handleTeamClick = (teamId: string) => {
+    openModal('TeamDetails', { teamId });
+  };
+
+  if (profileLoading || tasksLoading || teamsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <LoadingSpinner />
@@ -143,17 +154,17 @@ const Dashboard = () => {
 
   return (
     <motion.div 
-      className="space-y-8 p-6"
+      className="space-y-6 md:space-y-8 p-4 md:p-6"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
     >
       <motion.div variants={itemVariants} className="relative">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <motion.h1 
-                className="text-4xl font-bold gradient-text"
+                className="text-3xl md:text-4xl font-bold gradient-text"
                 animate={{ 
                   backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
                 }}
@@ -173,7 +184,7 @@ const Dashboard = () => {
               </motion.div>
             </div>
             
-            <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
                   Level {profile?.level || 1}
@@ -201,7 +212,7 @@ const Dashboard = () => {
             </div>
           </div>
           
-          <motion.div variants={itemVariants}>
+          <motion.div variants={itemVariants} className="self-start sm:self-center">
             <WidgetSelector
               onAddWidget={addWidget}
               existingWidgets={widgets.map(w => w.id)}
@@ -212,7 +223,7 @@ const Dashboard = () => {
 
       <motion.div variants={itemVariants}>
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8">
+          <TabsList className="grid grid-cols-1 sm:grid-cols-3 mb-6 md:mb-8">
             <TabsTrigger value="dashboard" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-4 w-4" />
               Dashboard
@@ -254,21 +265,49 @@ const Dashboard = () => {
                 </motion.div>
               ))}
             </div>
+            <div className="lg:col-span-1">
+              <GoalSuggester tasks={tasks} />
+            </div>
           </TabsContent>
 
           <TabsContent value="collaboration" className="space-y-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-            >
-              <DashboardWidget
-                id="collaboration-main"
-                title="Team Collaboration Hub"
-              >
-                <TeamInvite />
-              </DashboardWidget>
-            </motion.div>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Your Teams</h2>
+                <p className="text-muted-foreground">Collaborate with others in shared workspaces.</p>
+              </div>
+              <Button onClick={() => setCreateTeamModalOpen(true)} className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Create Team
+              </Button>
+            </div>
+
+            {teams && teams.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {teams.map((team: Team) => (
+                  <Card 
+                    key={team.id} 
+                    className="hover:shadow-lg transition-shadow duration-200 rounded-lg cursor-pointer"
+                    onClick={() => handleTeamClick(team.id)}
+                  >
+                    <CardHeader>
+                      <CardTitle>{team.name}</CardTitle>
+                      <CardDescription>{team.description}</CardDescription>
+                    </CardHeader>
+                    <CardFooter>
+                      <p className="text-sm text-muted-foreground">
+                        Click to view details
+                      </p>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 border-dashed border-2 rounded-lg">
+                <h3 className="text-xl font-semibold">You're not on any teams yet</h3>
+                <p className="text-muted-foreground mt-2">Create a new team to start collaborating.</p>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="insights" className="space-y-8">
@@ -354,6 +393,10 @@ const Dashboard = () => {
           </TabsContent>
         </Tabs>
       </motion.div>
+      <CreateTeamModal
+        isOpen={isCreateTeamModalOpen}
+        onClose={() => setCreateTeamModalOpen(false)}
+      />
     </motion.div>
   );
 };

@@ -1,8 +1,8 @@
-
-import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useEffect } from 'react';
 
 interface Profile {
   id: string;
@@ -19,50 +19,41 @@ interface Profile {
   is_active: boolean;
 }
 
+const fetchProfile = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(error.message);
+  }
+  return data;
+};
+
 export const useProfile = () => {
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const loadProfile = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+  const { data: profile, isLoading: loading } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: () => fetchProfile(user!.id),
+    enabled: !!user, // Only run the query if the user is available
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+  
+  // This could be used for real-time updates to the profile if needed
+  // useEffect(() => { ... });
 
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading profile:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load profile data.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setProfile(data);
-    } catch (error) {
-      console.error('Error loading profile:', error);
-    } finally {
-      setLoading(false);
-    }
+  const refreshProfile = () => {
+    queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
   };
-
-  useEffect(() => {
-    loadProfile();
-  }, [user]);
 
   return {
     profile,
     loading,
-    refreshProfile: loadProfile,
+    refreshProfile,
   };
 };

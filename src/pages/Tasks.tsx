@@ -1,39 +1,80 @@
-
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, BarChart3, Kanban } from 'lucide-react';
+import { Plus, BarChart3, Kanban, LayoutGrid, Calendar as CalendarIcon } from 'lucide-react';
 import TaskColumn from '@/components/TaskColumn';
 import TaskAnalytics from '@/components/TaskAnalytics';
-import TaskEditModal from '@/components/TaskEditModal';
-import TaskForm from '@/components/TaskForm';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
+import { useSupabaseTasks, Task } from '@/hooks/useSupabaseTasks';
+import { useHotkeys } from '@/hooks/useHotkeys';
+import { TemplateSelectionModal } from '@/components/TemplateSelectionModal';
+import { type TaskTemplate } from '@/hooks/useTaskTemplates';
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { enUS } from 'date-fns/locale/en-US';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { useModalStore } from '@/hooks/useModalStore';
 
-interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  status: 'todo' | 'in-progress' | 'review' | 'done';
-  priority: 'low' | 'medium' | 'high';
-  due_date?: string;
-  assignee?: string;
-  dependencies?: string[];
-  points?: number;
-  coins?: number;
-  team_id?: string;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-}
+const locales = {
+  'en-US': enUS,
+};
+
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales,
+});
 
 const Tasks = () => {
   const { tasks, loading, addTask, updateTask, deleteTask } = useSupabaseTasks();
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const openModal = useModalStore((state) => state.openModal);
+  const [isTemplateModalOpen, setTemplateModalOpen] = useState(false);
+
+  const events = useMemo(() => {
+    if (!tasks) return [];
+    return tasks
+      .filter(task => task.due_date)
+      .map(task => ({
+        id: task.id,
+        title: task.title,
+        start: new Date(task.due_date!),
+        end: new Date(task.due_date!),
+        resource: task,
+      }));
+  }, [tasks]);
+
+  const handleSelectEvent = (event: any) => {
+    openModal('TaskForm', { task: event.resource });
+  };
+  
+  const handleOpenForm = (task: Task | null) => {
+    openModal('TaskForm', { task });
+  };
+  
+  const handleOpenNewTaskModal = () => {
+    openModal('TaskForm');
+  };
+
+  const handleSelectTemplate = (template: TaskTemplate) => {
+    openModal('TaskForm', {
+      task: {
+        title: template.name,
+        description: template.description,
+        priority: template.priority,
+        points: template.points,
+        team_id: template.team_id,
+      }
+    });
+  };
+
+  useHotkeys({
+    'Cmd+T': useCallback(() => handleOpenNewTaskModal(), []),
+    'Ctrl+T': useCallback(() => handleOpenNewTaskModal(), []),
+  });
 
   const columns = [
     { id: 'todo' as const, title: 'To Do', color: 'bg-blue-500' },
@@ -42,51 +83,9 @@ const Tasks = () => {
     { id: 'done' as const, title: 'Done', color: 'bg-green-500' },
   ];
 
-  const handleDragEnd = (taskId: string, newStatus: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-
-    // Validate status
-    const validStatuses: Task['status'][] = ['todo', 'in-progress', 'review', 'done'];
-    if (!validStatuses.includes(newStatus as Task['status'])) {
-      console.error('Invalid status:', newStatus);
-      return;
-    }
-
-    // Check dependencies before allowing move to "done"
-    if (newStatus === 'done' && task.dependencies && task.dependencies.length > 0) {
-      const incompleteDependencies = task.dependencies.filter(depId => {
-        const depTask = tasks.find(t => t.id === depId);
-        return depTask && depTask.status !== 'done';
-      });
-
-      if (incompleteDependencies.length > 0) {
-        alert('Cannot move to Done: some dependencies are not completed yet.');
-        return;
-      }
-    }
-
-    updateTask(taskId, { status: newStatus as Task['status'] });
+  const handleDragEnd = (taskId: string, newStatus: Task['status']) => {
+    updateTask(taskId, { status: newStatus });
   };
-
-  const handleTaskClick = (task: Task) => {
-    setSelectedTask(task);
-    setIsEditModalOpen(true);
-  };
-
-  const handleEditSave = (taskId: string, updates: Partial<Task>) => {
-    updateTask(taskId, updates);
-    setIsEditModalOpen(false);
-    setSelectedTask(null);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <LoadingSpinner />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -94,20 +93,30 @@ const Tasks = () => {
         <div>
           <h1 className="text-3xl font-bold">Task Management</h1>
           <p className="text-muted-foreground">
-            Organize and track your tasks with our Kanban board
+            Organize, track, and visualize your tasks
           </p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Add Task
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setTemplateModalOpen(true)} variant="outline">
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            Create from Template
+          </Button>
+          <Button onClick={handleOpenNewTaskModal}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Task
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="board" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="board" className="flex items-center gap-2">
             <Kanban className="h-4 w-4" />
             Board View
+          </TabsTrigger>
+          <TabsTrigger value="calendar" className="flex items-center gap-2">
+            <CalendarIcon className="h-4 w-4" />
+            Calendar View
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
@@ -122,12 +131,25 @@ const Tasks = () => {
                 key={column.id}
                 column={column}
                 tasks={tasks.filter(task => task.status === column.id)}
-                onDragEnd={handleDragEnd}
+                isLoading={loading}
+                onDragEnd={handleDragEnd as any}
                 onUpdateTask={updateTask}
                 onDeleteTask={deleteTask}
-                onTaskClick={handleTaskClick}
+                onTaskClick={(task) => handleOpenForm(task)}
               />
             ))}
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="calendar">
+           <div className="h-[75vh] bg-card p-4 rounded-lg mt-4">
+            <Calendar
+              localizer={localizer}
+              events={events}
+              startAccessor="start"
+              endAccessor="end"
+              onSelectEvent={handleSelectEvent}
+            />
           </div>
         </TabsContent>
 
@@ -136,21 +158,10 @@ const Tasks = () => {
         </TabsContent>
       </Tabs>
 
-      <TaskForm
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onSubmit={addTask}
-      />
-
-      <TaskEditModal
-        task={selectedTask}
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setSelectedTask(null);
-        }}
-        onSave={handleEditSave}
-        allTasks={tasks}
+      <TemplateSelectionModal 
+        isOpen={isTemplateModalOpen}
+        onClose={() => setTemplateModalOpen(false)}
+        onSelectTemplate={handleSelectTemplate}
       />
     </div>
   );
