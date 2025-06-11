@@ -22,11 +22,14 @@ const Settings = () => {
   const [obsidianPath, setObsidianPath] = useState('');
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [encryptionEnabled, setEncryptionEnabled] = useState(true);
+  const [isElectronApp, setIsElectronApp] = useState(false);
   
   const { toast } = useToast();
   const { addAuditLog } = useAuditLog();
 
   useEffect(() => {
+    // A simple check to see if we're in an Electron renderer process.
+    setIsElectronApp(!!(window as any).isElectron);
     loadSettings();
   }, []);
 
@@ -181,72 +184,74 @@ const Settings = () => {
         </motion.div>
 
         {/* Obsidian Integration */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <Card className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center">
-              <Calendar className="h-5 w-5 mr-2" />
-              Obsidian Integration
-            </h3>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Label htmlFor="sync-enabled">Enable Vault Sync</Label>
-                  <HelpTooltip>
-                    When enabled, your journal entries will be automatically saved as markdown files in your chosen Obsidian vault.
-                  </HelpTooltip>
+        {isElectronApp && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <Card className="glass-card p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center">
+                <Calendar className="h-5 w-5 mr-2" />
+                Obsidian Integration
+              </h3>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Label htmlFor="sync-enabled">Enable Vault Sync</Label>
+                    <HelpTooltip>
+                      When enabled, your journal entries will be automatically saved as markdown files in your chosen Obsidian vault.
+                    </HelpTooltip>
+                  </div>
+                  <Switch
+                    id="sync-enabled"
+                    checked={syncEnabled}
+                    onCheckedChange={setSyncEnabled}
+                  />
                 </div>
-                <Switch
-                  id="sync-enabled"
-                  checked={syncEnabled}
-                  onCheckedChange={setSyncEnabled}
-                />
-              </div>
 
-              <div>
-                <div className="flex items-center">
-                  <Label htmlFor="obsidian-path" className="mb-2 block">Vault Path</Label>
-                  <HelpTooltip>
-                    Provide the full path to your local Obsidian vault. The app needs this to read and write files.
-                  </HelpTooltip>
-                </div>
-                <input
-                  id="obsidian-path"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="/path/to/your/obsidian/vault"
-                  value={obsidianPath}
-                  onChange={(e) => setObsidianPath(e.target.value)}
-                  disabled={!syncEnabled}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Journal entries will be exported as markdown files
-                </p>
-              </div>
-
-              <Button 
-                onClick={saveObsidianSettings}
-                className="w-full bg-gradient-primary hover:opacity-90"
-              >
-                Save Obsidian Settings
-              </Button>
-
-              <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
-                <p className="text-sm text-green-400">
-                  <strong>Sync Status:</strong> {syncEnabled ? 'Enabled' : 'Disabled'}
-                </p>
-                {syncEnabled && (
+                <div>
+                  <div className="flex items-center">
+                    <Label htmlFor="obsidian-path" className="mb-2 block">Vault Path</Label>
+                    <HelpTooltip>
+                      Provide the full path to your local Obsidian vault. The app needs this to read and write files.
+                    </HelpTooltip>
+                  </div>
+                  <input
+                    id="obsidian-path"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="/path/to/your/obsidian/vault"
+                    value={obsidianPath}
+                    onChange={(e) => setObsidianPath(e.target.value)}
+                    disabled={!syncEnabled}
+                  />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Entries will be downloaded as markdown files
+                    Journal entries will be exported as markdown files
                   </p>
-                )}
+                </div>
+
+                <Button 
+                  onClick={saveObsidianSettings}
+                  className="w-full bg-gradient-primary hover:opacity-90"
+                >
+                  Save Obsidian Settings
+                </Button>
+
+                <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                  <p className="text-sm text-green-400">
+                    <strong>Sync Status:</strong> {syncEnabled ? 'Enabled' : 'Disabled'}
+                  </p>
+                  {syncEnabled && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Entries will be downloaded as markdown files
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          </Card>
-        </motion.div>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Privacy & Security */}
         <motion.div

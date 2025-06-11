@@ -5,6 +5,10 @@ import './index.css';
 import './i18n';
 import * as Sentry from '@sentry/react';
 import { BrowserRouter } from 'react-router-dom';
+import { initializeObsidianSync } from './lib/obsidian';
+
+// Initialize services
+initializeObsidianSync();
 
 Sentry.init({
   dsn: 'https://774393b2280a37397c6d1d0c272a5f15@o4507423982485504.ingest.us.sentry.io/4507423985434624',

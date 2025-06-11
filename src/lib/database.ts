@@ -1,5 +1,5 @@
 import { encrypt, decrypt } from './encryption';
-import { syncManager } from './sync';
+import { obsidianSync } from './obsidian';
 
 interface JournalEntry {
   id: string;
@@ -156,7 +156,7 @@ class Database {
 
   // Journal methods
   async saveJournalEntry(entry: JournalEntry): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       const encryptedEntry = {
         ...entry,
@@ -198,7 +198,7 @@ class Database {
   }
 
   async deleteJournalEntry(id: string): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       return new Promise((resolve, reject) => {
         const transaction = this.db!.transaction(['journal_entries'], 'readwrite');
@@ -215,7 +215,7 @@ class Database {
 
   // Habit methods
   async saveHabit(habit: Habit): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       const encryptedHabit = {
         ...habit,
@@ -257,7 +257,7 @@ class Database {
   }
 
   async deleteHabit(id: string): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       return new Promise((resolve, reject) => {
         const transaction = this.db!.transaction(['habits'], 'readwrite');
@@ -274,7 +274,7 @@ class Database {
 
   // Goal methods
   async saveGoal(goal: Goal): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       const encryptedGoal = {
         ...goal,
@@ -312,7 +312,7 @@ class Database {
   }
 
   async deleteGoal(id: string): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       return new Promise((resolve, reject) => {
         const transaction = this.db!.transaction(['goals'], 'readwrite');
@@ -329,7 +329,7 @@ class Database {
 
   // Settings methods
   async saveSetting(key: string, value: any): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       return new Promise((resolve, reject) => {
         const transaction = this.db!.transaction(['settings'], 'readwrite');
@@ -362,7 +362,7 @@ class Database {
 
   // Transaction methods
   async saveTransaction(transaction: any): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       const encryptedTransaction = {
         ...transaction,
@@ -399,7 +399,7 @@ class Database {
   }
 
   async deleteTransaction(id: string): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       return new Promise((resolve, reject) => {
         const transaction = this.db!.transaction(['transactions'], 'readwrite');
@@ -416,7 +416,7 @@ class Database {
 
   // Budget methods
   async saveBudget(budget: any): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       const encryptedBudget = {
         ...budget,
@@ -454,7 +454,7 @@ class Database {
 
   // Financial Goal methods
   async saveFinancialGoal(goal: any): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       const encryptedGoal = {
         ...goal,
@@ -492,7 +492,7 @@ class Database {
 
   // Task methods
   async saveTask(task: any): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       const encryptedTask = {
         ...task,
@@ -530,7 +530,7 @@ class Database {
   }
 
   async deleteTask(id: string): Promise<void> {
-    if (syncManager.getStatus().isOnline) {
+    if (obsidianSync.getStatus().isOnline) {
       if (!this.db) await this.init();
       return new Promise((resolve, reject) => {
         const transaction = this.db!.transaction(['tasks'], 'readwrite');

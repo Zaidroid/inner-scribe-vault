@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { obsidianSync } from '@/lib/obsidian';
+import { obsidianSync } from '../lib/obsidian';
 import { Download } from 'lucide-react';
+import { db } from '../lib/database';
 
 interface ExportButtonProps {
   entry: any;
