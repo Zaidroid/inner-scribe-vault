@@ -97,10 +97,10 @@ const Tasks = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setTemplateModalOpen(true)} variant="outline">
+          {/* <Button onClick={() => setTemplateModalOpen(true)} variant="outline">
             <LayoutGrid className="h-4 w-4 mr-2" />
             Create from Template
-          </Button>
+          </Button> */}
           <Button onClick={handleOpenNewTaskModal}>
             <Plus className="h-4 w-4 mr-2" />
             New Task
@@ -158,11 +158,11 @@ const Tasks = () => {
         </TabsContent>
       </Tabs>
 
-      <TemplateSelectionModal 
+      {/* <TemplateSelectionModal 
         isOpen={isTemplateModalOpen}
         onClose={() => setTemplateModalOpen(false)}
         onSelectTemplate={handleSelectTemplate}
-      />
+      /> */}
     </div>
   );
 };

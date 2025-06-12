@@ -218,9 +218,10 @@ const TaskForm = ({ isOpen, onClose, task }: TaskFormProps) => {
                 ) : (
                   <>
                     <SelectItem value="none">None</SelectItem>
-                    {users?.map(user => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.full_name || user.username}
+                    {user && <SelectItem value={user.id}>{user.email}</SelectItem>}
+                    {users?.filter(u => u.id !== user?.id).map(u => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.full_name || u.username}
                       </SelectItem>
                     ))}
                   </>

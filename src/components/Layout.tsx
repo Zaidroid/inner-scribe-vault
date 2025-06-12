@@ -1,7 +1,7 @@
 import React from 'react';
 import Sidebar from './Sidebar';
 import Navigation from './Navigation';
-import WelcomeModal from './WelcomeModal';
+// import WelcomeModal from './WelcomeModal';
 import { useRealtime } from '@/hooks/useRealtime';
 import Header from './Header';
 import ModalProvider from './ModalProvider';
@@ -23,7 +23,7 @@ const Layout = ({ children }: LayoutProps) => {
         </main>
       </div>
       <Navigation />
-      <WelcomeModal />
+      {/* <WelcomeModal /> */}
       <ModalProvider />
     </div>
   );

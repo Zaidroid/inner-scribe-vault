@@ -156,28 +156,23 @@ class Database {
 
   // Journal methods
   async saveJournalEntry(entry: JournalEntry): Promise<void> {
+    if (!this.db) await this.init();
+    const encryptedEntry = {
+      ...entry,
+      title: await encrypt(entry.title),
+      content: await encrypt(entry.content),
+      tags: await Promise.all(entry.tags.map(tag => encrypt(tag))),
+    };
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['journal_entries'], 'readwrite');
+      const store = transaction.objectStore('journal_entries');
+      const request = store.put(encryptedEntry);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
     if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      const encryptedEntry = {
-        ...entry,
-        title: await encrypt(entry.title),
-        content: await encrypt(entry.content),
-        tags: await Promise.all(entry.tags.map(tag => encrypt(tag))),
-      };
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['journal_entries'], 'readwrite');
-        const store = transaction.objectStore('journal_entries');
-        const request = store.put(encryptedEntry);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'update', path: `journals/${entry.id}.md`, content: entry.content });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'saveJournalEntry', payload: entry });
+      obsidianSync.addPendingChange({ type: 'update', path: `journals/${entry.id}.md`, content: entry.content, source: 'app' });
     }
   }
 
@@ -203,51 +198,41 @@ class Database {
   }
 
   async deleteJournalEntry(id: string): Promise<void> {
-    if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['journal_entries'], 'readwrite');
-        const store = transaction.objectStore('journal_entries');
-        const request = store.delete(id);
+    if (!this.db) await this.init();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['journal_entries'], 'readwrite');
+      const store = transaction.objectStore('journal_entries');
+      const request = store.delete(id);
 
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'delete', path: `journals/${id}.md` });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'deleteJournalEntry', payload: { id } });
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
+    if (obsidianSync.getState().isSyncing) {
+      obsidianSync.addPendingChange({ type: 'delete', path: `journals/${id}.md` });
     }
   }
 
   // Habit methods
   async saveHabit(habit: Habit): Promise<void> {
+    if (!this.db) await this.init();
+    const encryptedHabit = {
+      ...habit,
+      name: await encrypt(habit.name),
+      description: await encrypt(habit.description),
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['habits'], 'readwrite');
+      const store = transaction.objectStore('habits');
+      const request = store.put(encryptedHabit);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
     if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      const encryptedHabit = {
-        ...habit,
-        name: await encrypt(habit.name),
-        description: await encrypt(habit.description),
-      };
-
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['habits'], 'readwrite');
-        const store = transaction.objectStore('habits');
-        const request = store.put(encryptedHabit);
-
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'update', path: `habits/${habit.id}.md`, content: habit.name });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'saveHabit', payload: habit });
+      obsidianSync.addPendingChange({ type: 'update', path: `habits/${habit.id}.md`, content: habit.name });
     }
   }
 
@@ -272,51 +257,41 @@ class Database {
   }
 
   async deleteHabit(id: string): Promise<void> {
-    if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['habits'], 'readwrite');
-        const store = transaction.objectStore('habits');
-        const request = store.delete(id);
+    if (!this.db) await this.init();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['habits'], 'readwrite');
+      const store = transaction.objectStore('habits');
+      const request = store.delete(id);
 
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'delete', path: `habits/${id}.md` });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'deleteHabit', payload: { id } });
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
+    if (obsidianSync.getState().isSyncing) {
+      obsidianSync.addPendingChange({ type: 'delete', path: `habits/${id}.md` });
     }
   }
 
   // Goal methods
   async saveGoal(goal: Goal): Promise<void> {
+    if (!this.db) await this.init();
+    const encryptedGoal = {
+      ...goal,
+      title: await encrypt(goal.title),
+      description: await encrypt(goal.description),
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['goals'], 'readwrite');
+      const store = transaction.objectStore('goals');
+      const request = store.put(encryptedGoal);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
     if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      const encryptedGoal = {
-        ...goal,
-        title: await encrypt(goal.title),
-        description: await encrypt(goal.description),
-      };
-
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['goals'], 'readwrite');
-        const store = transaction.objectStore('goals');
-        const request = store.put(encryptedGoal);
-
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'update', path: `goals/${goal.id}.md`, content: JSON.stringify(goal) });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'saveGoal', payload: goal });
+      obsidianSync.addPendingChange({ type: 'update', path: `goals/${goal.id}.md`, content: JSON.stringify(goal) });
     }
   }
 
@@ -337,45 +312,35 @@ class Database {
   }
 
   async deleteGoal(id: string): Promise<void> {
-    if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['goals'], 'readwrite');
-        const store = transaction.objectStore('goals');
-        const request = store.delete(id);
+    if (!this.db) await this.init();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['goals'], 'readwrite');
+      const store = transaction.objectStore('goals');
+      const request = store.delete(id);
 
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'delete', path: `goals/${id}.md` });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'deleteGoal', payload: { id } });
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
+    if (obsidianSync.getState().isSyncing) {
+      obsidianSync.addPendingChange({ type: 'delete', path: `goals/${id}.md` });
     }
   }
 
   // Settings methods
   async saveSetting(key: string, value: any): Promise<void> {
-    if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['settings'], 'readwrite');
-        const store = transaction.objectStore('settings');
-        const request = store.put({ key, value });
+    if (!this.db) await this.init();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['settings'], 'readwrite');
+      const store = transaction.objectStore('settings');
+      const request = store.put({ key, value });
 
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'update', path: `settings/${key}.md`, content: JSON.stringify({ key, value }) });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'saveSetting', payload: { key, value } });
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+    
+    if (obsidianSync.getState().isSyncing) {
+      obsidianSync.addPendingChange({ type: 'update', path: `settings/${key}.md`, content: JSON.stringify({ key, value }) });
     }
   }
 
@@ -397,28 +362,23 @@ class Database {
 
   // Transaction methods
   async saveTransaction(transaction: Transaction): Promise<void> {
+    if (!this.db) await this.init();
+    const encryptedTransaction = {
+      ...transaction,
+      description: await encrypt(transaction.description),
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      const transactionDB = this.db!.transaction(['transactions'], 'readwrite');
+      const store = transactionDB.objectStore('transactions');
+      const request = store.put(encryptedTransaction);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
     if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      const encryptedTransaction = {
-        ...transaction,
-        description: await encrypt(transaction.description),
-      };
-
-      return new Promise((resolve, reject) => {
-        const transactionDB = this.db!.transaction(['transactions'], 'readwrite');
-        const store = transactionDB.objectStore('transactions');
-        const request = store.put(encryptedTransaction);
-
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'update', path: `transactions/${transaction.id}.md`, content: JSON.stringify(transaction) });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'saveTransaction', payload: transaction });
+      obsidianSync.addPendingChange({ type: 'update', path: `transactions/${transaction.id}.md`, content: JSON.stringify(transaction) });
     }
   }
 
@@ -439,50 +399,40 @@ class Database {
   }
 
   async deleteTransaction(id: string): Promise<void> {
-    if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['transactions'], 'readwrite');
-        const store = transaction.objectStore('transactions');
-        const request = store.delete(id);
+    if (!this.db) await this.init();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['transactions'], 'readwrite');
+      const store = transaction.objectStore('transactions');
+      const request = store.delete(id);
 
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'delete', path: `transactions/${id}.md` });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'deleteTransaction', payload: { id } });
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
+    if (obsidianSync.getState().isSyncing) {
+      obsidianSync.addPendingChange({ type: 'delete', path: `transactions/${id}.md` });
     }
   }
 
   // Budget methods
   async saveBudget(budget: Budget): Promise<void> {
+    if (!this.db) await this.init();
+    const encryptedBudget = {
+      ...budget,
+      category: await encrypt(budget.category),
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['budgets'], 'readwrite');
+      const store = transaction.objectStore('budgets');
+      const request = store.put(encryptedBudget);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
     if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      const encryptedBudget = {
-        ...budget,
-        category: await encrypt(budget.category),
-      };
-
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['budgets'], 'readwrite');
-        const store = transaction.objectStore('budgets');
-        const request = store.put(encryptedBudget);
-
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'update', path: `budgets/${budget.id}.md`, content: JSON.stringify(budget) });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'saveBudget', payload: budget });
+      obsidianSync.addPendingChange({ type: 'update', path: `budgets/${budget.id}.md`, content: JSON.stringify(budget) });
     }
   }
 
@@ -503,50 +453,40 @@ class Database {
   }
 
   async deleteBudget(id: string): Promise<void> {
-    if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['budgets'], 'readwrite');
-        const store = transaction.objectStore('budgets');
-        const request = store.delete(id);
+    if (!this.db) await this.init();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['budgets'], 'readwrite');
+      const store = transaction.objectStore('budgets');
+      const request = store.delete(id);
 
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'delete', path: `budgets/${id}.md` });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'deleteBudget', payload: { id } });
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
+    if (obsidianSync.getState().isSyncing) {
+      obsidianSync.addPendingChange({ type: 'delete', path: `budgets/${id}.md` });
     }
   }
 
   // Financial Goal methods
   async saveFinancialGoal(goal: FinancialGoal): Promise<void> {
+    if (!this.db) await this.init();
+    const encryptedGoal = {
+      ...goal,
+      title: await encrypt(goal.title),
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['financial_goals'], 'readwrite');
+      const store = transaction.objectStore('financial_goals');
+      const request = store.put(encryptedGoal);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
     if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      const encryptedGoal = {
-        ...goal,
-        title: await encrypt(goal.title),
-      };
-
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['financial_goals'], 'readwrite');
-        const store = transaction.objectStore('financial_goals');
-        const request = store.put(encryptedGoal);
-
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'update', path: `goals/${goal.id}.md`, content: JSON.stringify(goal) });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'saveFinancialGoal', payload: goal });
+      obsidianSync.addPendingChange({ type: 'update', path: `goals/${goal.id}.md`, content: JSON.stringify(goal) });
     }
   }
 
@@ -567,51 +507,41 @@ class Database {
   }
 
   async deleteFinancialGoal(id: string): Promise<void> {
-    if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['financial_goals'], 'readwrite');
-        const store = transaction.objectStore('financial_goals');
-        const request = store.delete(id);
+    if (!this.db) await this.init();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['financial_goals'], 'readwrite');
+      const store = transaction.objectStore('financial_goals');
+      const request = store.delete(id);
 
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'delete', path: `goals/${id}.md` });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'deleteFinancialGoal', payload: { id } });
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
+    if (obsidianSync.getState().isSyncing) {
+      obsidianSync.addPendingChange({ type: 'delete', path: `goals/${id}.md` });
     }
   }
 
   // Task methods
   async saveTask(task: Task): Promise<void> {
+    if (!this.db) await this.init();
+    const encryptedTask = {
+      ...task,
+      title: await encrypt(task.title),
+      description: await encrypt(task.description || ''),
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['tasks'], 'readwrite');
+      const store = transaction.objectStore('tasks');
+      const request = store.put(encryptedTask);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
     if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      const encryptedTask = {
-        ...task,
-        title: await encrypt(task.title),
-        description: await encrypt(task.description || ''),
-      };
-
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['tasks'], 'readwrite');
-        const store = transaction.objectStore('tasks');
-        const request = store.put(encryptedTask);
-
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'update', path: `tasks/${task.id}.md`, content: task.title });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'saveTask', payload: task });
+      obsidianSync.addPendingChange({ type: 'update', path: `tasks/${task.id}.md`, content: task.title });
     }
   }
 
@@ -632,23 +562,18 @@ class Database {
   }
 
   async deleteTask(id: string): Promise<void> {
-    if (obsidianSync.getState().isSyncing) {
-      if (!this.db) await this.init();
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(['tasks'], 'readwrite');
-        const store = transaction.objectStore('tasks');
-        const request = store.delete(id);
+    if (!this.db) await this.init();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['tasks'], 'readwrite');
+      const store = transaction.objectStore('tasks');
+      const request = store.delete(id);
 
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          if (obsidianSync.getState().isSyncing) {
-            obsidianSync.addPendingChange({ type: 'delete', path: `tasks/${id}.md` });
-          }
-          resolve();
-        };
-      });
-    } else {
-      await this.addMutation({ type: 'deleteTask', payload: { id } });
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
+    if (obsidianSync.getState().isSyncing) {
+      obsidianSync.addPendingChange({ type: 'delete', path: `tasks/${id}.md` });
     }
   }
 
@@ -809,7 +734,7 @@ class Database {
   // New method to move a mutation to the dead-letter queue
   async moveToDeadLetterQueue(mutation: Mutation): Promise<void> {
     if (!this.db) await this.init();
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
         const transaction = this.db!.transaction(['mutations', 'dead_mutations'], 'readwrite');
         const mutationsStore = transaction.objectStore('mutations');
         const deadStore = transaction.objectStore('dead_mutations');
@@ -860,7 +785,7 @@ class Database {
 
   async deleteDeadMutation(id: number): Promise<void> {
     if (!this.db) await this.init();
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
         const transaction = this.db!.transaction(['dead_mutations'], 'readwrite');
         const store = transaction.objectStore('dead_mutations');
         const request = store.delete(id);
