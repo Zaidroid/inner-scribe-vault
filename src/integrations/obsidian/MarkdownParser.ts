@@ -2,7 +2,6 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkFrontmatter from 'remark-frontmatter';
-import remarkObsidian from 'remark-obsidian';
 import remarkRehype from 'remark-rehype';
 import rehypeStringify from 'rehype-stringify';
 import { VaultFile } from './types';
@@ -36,7 +35,6 @@ export class MarkdownParser {
       .use(remarkParse)
       .use(remarkGfm)
       .use(remarkFrontmatter, ['yaml', 'toml'])
-      .use(remarkObsidian)
       .use(remarkRehype)
       .use(rehypeStringify);
   }

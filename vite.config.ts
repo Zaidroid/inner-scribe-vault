@@ -59,14 +59,6 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: [
         {
-          find: '@/integrations/obsidian/SyncService',
-          replacement: path.resolve(__dirname, isElectron ? './src/integrations/obsidian/SyncService.ts' : './src/integrations/obsidian/SyncService.mock.ts')
-        },
-        {
-          find: '@/integrations/obsidian/MarkdownParser',
-          replacement: path.resolve(__dirname, isElectron ? './src/integrations/obsidian/MarkdownParser.ts' : './src/integrations/obsidian/MarkdownParser.mock.ts')
-        },
-        {
           find: "@",
           replacement: path.resolve(__dirname, "./src"),
         },
