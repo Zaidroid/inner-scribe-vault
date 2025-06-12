@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { obsidianSync } from '../lib/obsidian';
 import { Badge } from './ui/badge';
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 // New hook for detailed status
 export function useSyncDetailedStatus() {
@@ -39,31 +40,31 @@ export function useSyncDetailedStatus() {
 
 // UI component to display the status
 export function SyncStatusIndicator() {
-  const { isOnline, isSyncing, pendingCount } = useSyncDetailedStatus();
+  const [status, setStatus] = useState({
+    isOnline: obsidianSync.getState().isSyncing,
+  });
 
-  if (isSyncing) {
-    return (
-      <Badge variant="default" className="flex items-center gap-2 bg-blue-500 text-white">
-        <RefreshCw className="h-4 w-4 animate-spin" />
-        <span>Syncing...</span>
-      </Badge>
-    );
-  }
+  useEffect(() => {
+    const handleSyncStatusChange = (newState: any) => {
+      setStatus({ isOnline: newState.isSyncing });
+    };
+
+    obsidianSync.on('sync-started', () => handleSyncStatusChange({ isSyncing: true }));
+    obsidianSync.on('sync-completed', () => handleSyncStatusChange({ isSyncing: false }));
+    obsidianSync.on('sync-error', () => handleSyncStatusChange({ isSyncing: false }));
+
+    return () => {
+      obsidianSync.removeListener('sync-started', () => handleSyncStatusChange({ isSyncing: true }));
+      obsidianSync.removeListener('sync-completed', () => handleSyncStatusChange({ isSyncing: false }));
+      obsidianSync.removeListener('sync-error', () => handleSyncStatusChange({ isSyncing: false }));
+    };
+  }, []);
 
   return (
-    <Badge variant={isOnline ? 'default' : 'destructive'} className="flex items-center gap-2">
-      {isOnline ? (
-        <>
-          <Wifi className="h-4 w-4" />
-          <span>Online</span>
-        </>
-      ) : (
-        <>
-          <WifiOff className="h-4 w-4" />
-          <span>Offline</span>
-          {pendingCount > 0 && <span className="text-xs">({pendingCount})</span>}
-        </>
-      )}
-    </Badge>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <Badge variant={status.isOnline ? 'default' : 'secondary'}>
+        {status.isOnline ? 'Syncing...' : 'Idle'}
+      </Badge>
+    </motion.div>
   );
 } 
