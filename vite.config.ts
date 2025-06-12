@@ -6,57 +6,71 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  define: {
-    // This makes the variable available in the client-side code
-    'process.env.IS_ELECTRON': JSON.stringify(process.env.IS_ELECTRON === 'true'),
-  },
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  plugins: [
-    react(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
-      manifest: {
-        name: 'Inner Scribe Vault',
-        short_name: 'InnerScribe',
-        description: 'An AI-powered journaling and self-mastery application.',
-        theme_color: '#1a1a1a',
-        icons: [
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable',
-          }
-        ],
-      },
-    }),
-    mode === 'development' &&
-    componentTagger(),
-  ].filter(Boolean),
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: './vitest.setup.ts',
-    css: true,
-  },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+export default defineConfig(({ mode }) => {
+  const isElectron = process.env.IS_ELECTRON === 'true';
+
+  return {
+    define: {
+      'process.env.IS_ELECTRON': JSON.stringify(isElectron),
     },
-  },
-}));
+    server: {
+      host: "::",
+      port: 8080,
+    },
+    plugins: [
+      react(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+        manifest: {
+          name: 'Inner Scribe Vault',
+          short_name: 'InnerScribe',
+          description: 'An AI-powered journaling and self-mastery application.',
+          theme_color: '#1a1a1a',
+          icons: [
+            {
+              src: 'pwa-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+            },
+            {
+              src: 'pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+            },
+            {
+              src: 'pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any maskable',
+            }
+          ],
+        },
+      }),
+      mode === 'development' &&
+      componentTagger(),
+    ].filter(Boolean),
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './vitest.setup.ts',
+      css: true,
+    },
+    resolve: {
+      alias: [
+        {
+          find: '@/integrations/obsidian/SyncService',
+          replacement: path.resolve(__dirname, isElectron ? './src/integrations/obsidian/SyncService.ts' : './src/integrations/obsidian/SyncService.mock.ts')
+        },
+        {
+          find: '@/integrations/obsidian/MarkdownParser',
+          replacement: path.resolve(__dirname, isElectron ? './src/integrations/obsidian/MarkdownParser.ts' : './src/integrations/obsidian/MarkdownParser.mock.ts')
+        },
+        {
+          find: "@",
+          replacement: path.resolve(__dirname, "./src"),
+        },
+      ]
+    },
+  }
+});
