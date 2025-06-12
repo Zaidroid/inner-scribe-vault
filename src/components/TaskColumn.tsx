@@ -151,7 +151,7 @@ const TaskColumn = ({ column, tasks, onDragEnd, onUpdateTask, onDeleteTask, onTa
           ))
         ) : (
           <div className="text-center py-8 text-muted-foreground">
-            <p className="text-sm">No tasks in {column.title.toLowerCase()}</p>
+            <p className="text-sm">No tasks in {column.title ? column.title.toLowerCase() : ''}</p>
           </div>
         )}
       </div>

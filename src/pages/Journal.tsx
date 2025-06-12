@@ -79,11 +79,13 @@ const Journal = () => {
     }
   };
 
-  const filteredEntries = entries.filter(entry =>
-    entry.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    entry.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    entry.tags.some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredEntries = entries.filter(entry => {
+    const term = searchTerm.toLowerCase();
+    const titleMatch = entry.title && entry.title.toLowerCase().includes(term);
+    const contentMatch = entry.content && entry.content.toLowerCase().includes(term);
+    const tagsMatch = entry.tags && entry.tags.some(tag => tag && tag.toLowerCase().includes(term));
+    return titleMatch || contentMatch || tagsMatch;
+  });
 
   const getMoodColor = (mood: string) => {
     const colors = {
@@ -201,7 +203,7 @@ const Journal = () => {
                     {entry.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {entry.tags.slice(0, 3).map((tag: string) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
+                          tag && <Badge key={tag} variant="secondary" className="text-xs">
                             {tag}
                           </Badge>
                         ))}
