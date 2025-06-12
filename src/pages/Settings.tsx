@@ -22,14 +22,12 @@ const Settings = () => {
   const [obsidianPath, setObsidianPath] = useState('');
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [encryptionEnabled, setEncryptionEnabled] = useState(true);
-  const [isElectronApp, setIsElectronApp] = useState(false);
+  const isElectronApp = process.env.IS_ELECTRON;
   
   const { toast } = useToast();
   const { addAuditLog } = useAuditLog();
 
   useEffect(() => {
-    // A simple check to see if we're in an Electron renderer process.
-    setIsElectronApp(!!(window as any).isElectron);
     loadSettings();
   }, []);
 

@@ -2,9 +2,10 @@
 // It conditionally exports the real implementation for Electron
 // and a mock/dummy version for the web to prevent bundling Node.js-dependent code.
 
-// A simple check to see if we're in an Electron renderer process.
-// This requires exposing a value on the window object via a preload script in Electron.
-const isElectron = !!(window as any).isElectron;
+// This check now uses a build-time variable.
+// For the Netlify build (npm run build), IS_ELECTRON will not be set, so this will be false.
+// For the Electron build, you will need to set this variable, e.g., "IS_ELECTRON=true npm run build"
+const isElectron = process.env.IS_ELECTRON;
 
 class MockSyncManager {
   updateConfig(config: any) {
