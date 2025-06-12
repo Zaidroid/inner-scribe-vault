@@ -65,4 +65,28 @@ CREATE TRIGGER on_tasks_updated
   FOR EACH ROW
   EXECUTE PROCEDURE public.handle_updated_at();
 
+-- Create activity table for logging actions
+CREATE TABLE public.activity (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE, -- Nullable for personal tasks
+  activity_type TEXT NOT NULL,
+  entity_id UUID,
+  data JSONB
+);
+
+-- RLS for profiles
 alter table "public"."profiles" enable row level security; 
+CREATE POLICY "Allow authenticated users to see all profiles" ON "public"."profiles"
+AS PERMISSIVE FOR SELECT
+TO authenticated
+USING (true);
+CREATE POLICY "Users can insert their own profile" ON "public"."profiles"
+AS PERMISSIVE FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = id);
+CREATE POLICY "Users can update their own profile" ON "public"."profiles"
+AS PERMISSIVE FOR UPDATE
+TO authenticated
+USING (auth.uid() = id); 

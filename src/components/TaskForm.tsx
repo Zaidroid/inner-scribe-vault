@@ -55,8 +55,8 @@ const TaskForm = ({ isOpen, onClose, task }: TaskFormProps) => {
       } else {
         // Reset for create mode
         setFormData({
-          title: task?.title || '',
-          description: task?.description || '',
+          title: '',
+          description: '',
           status: 'todo',
           priority: 'medium',
           due_date: '',
@@ -208,7 +208,7 @@ const TaskForm = ({ isOpen, onClose, task }: TaskFormProps) => {
 
           <div>
             <Label htmlFor="assignee">Assignee</Label>
-            <Select value={formData.assignee} onValueChange={(value) => handleChange('assignee', value)}>
+            <Select key={formData.assignee} value={formData.assignee} onValueChange={(value) => handleChange('assignee', value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a member..." />
               </SelectTrigger>
