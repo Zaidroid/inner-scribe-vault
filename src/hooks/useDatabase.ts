@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/database';
 
@@ -9,7 +8,11 @@ export const useJournal = () => {
   const loadEntries = async () => {
     try {
       const journalEntries = await db.getJournalEntries();
-      setEntries(journalEntries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      if (Array.isArray(journalEntries)) {
+        setEntries(journalEntries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      } else {
+        setEntries([]);
+      }
     } catch (error) {
       console.error('Failed to load journal entries:', error);
     } finally {
@@ -53,7 +56,11 @@ export const useHabits = () => {
   const loadHabits = async () => {
     try {
       const habitList = await db.getHabits();
-      setHabits(habitList);
+      if (Array.isArray(habitList)) {
+        setHabits(habitList);
+      } else {
+        setHabits([]);
+      }
     } catch (error) {
       console.error('Failed to load habits:', error);
     } finally {
@@ -121,7 +128,11 @@ export const useGoals = () => {
   const loadGoals = async () => {
     try {
       const goalList = await db.getGoals();
-      setGoals(goalList);
+      if (Array.isArray(goalList)) {
+        setGoals(goalList);
+      } else {
+        setGoals([]);
+      }
     } catch (error) {
       console.error('Failed to load goals:', error);
     } finally {
