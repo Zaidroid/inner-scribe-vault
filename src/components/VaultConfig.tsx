@@ -8,7 +8,7 @@ import { Switch } from './ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Alert, AlertDescription } from './ui/alert';
-import { syncManager } from '../lib/sync';
+import { obsidianSync } from '../lib/obsidian';
 import { DeadLetterQueue } from './DeadLetterQueue';
 
 const DEFAULT_SETTINGS: VaultSettings = {
@@ -118,14 +118,14 @@ export function VaultConfig() {
     
     // Update the sync manager for strategy changes
     if (section === 'sync' && key === 'strategy') {
-      syncManager.setStrategy(value);
+      obsidianSync.updateConfig({ strategy: value });
     }
     
     // Update the sync manager for background sync changes
     if (section === 'sync' && (key === 'autoSync' || key === 'interval')) {
       const isEnabled = key === 'autoSync' ? value : newSettings.sync.autoSync;
       const syncInterval = key === 'interval' ? value : newSettings.sync.interval;
-      syncManager.configure({ enabled: isEnabled, interval: syncInterval });
+      obsidianSync.updateConfig({ enabled: isEnabled, interval: syncInterval });
     }
   };
 
