@@ -30,7 +30,9 @@ const ExportButtons = ({ reportData }: ExportButtonsProps) => {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `report-${new Date().toISOString().split('T')[0]}.csv`);
+    const dateString = new Date().toISOString();
+    const datePart = dateString ? dateString.split('T')[0] : 'report';
+    link.setAttribute('download', `report-${datePart}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -6,6 +6,8 @@ export const useHotkeys = (hotkeys: Record<string, HotkeyCallback>) => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       for (const key in hotkeys) {
+        if (typeof key !== 'string') continue;
+
         const parts = key.split('+').map(part => part.trim().toLowerCase());
         const specialKeys = parts.slice(0, -1);
         const mainKey = parts[parts.length - 1];
@@ -23,7 +25,7 @@ export const useHotkeys = (hotkeys: Record<string, HotkeyCallback>) => {
           if (!event.altKey) match = false;
         }
 
-        if (event.key.toLowerCase() === mainKey && match) {
+        if (event.key && event.key.toLowerCase() === mainKey && match) {
           event.preventDefault();
           hotkeys[key](event);
         }
