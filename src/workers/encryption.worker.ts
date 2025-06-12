@@ -4,7 +4,7 @@ import CryptoJS from 'crypto-js';
 let sessionKey: string | null = null;
 
 self.onmessage = (event: MessageEvent) => {
-    const { type, payload } = event.data;
+    const { type, payload, id } = event.data;
 
     switch (type) {
         case 'SET_KEY':
@@ -12,19 +12,19 @@ self.onmessage = (event: MessageEvent) => {
             break;
         case 'ENCRYPT':
             if (!sessionKey) {
-                self.postMessage({ type: 'ENCRYPT_RESULT', error: 'Encryption key not set.' });
+                self.postMessage({ id, type: 'ENCRYPT_RESULT', error: 'Encryption key not set.' });
                 break;
             }
             try {
                 const encrypted = CryptoJS.AES.encrypt(JSON.stringify(payload.data), sessionKey).toString();
-                self.postMessage({ type: 'ENCRYPT_RESULT', payload: { encrypted } });
+                self.postMessage({ id, type: 'ENCRYPT_RESULT', payload: { encrypted } });
             } catch (error) {
-                self.postMessage({ type: 'ENCRYPT_RESULT', error: error.message });
+                self.postMessage({ id, type: 'ENCRYPT_RESULT', error: error.message });
             }
             break;
         case 'DECRYPT':
             if (!sessionKey) {
-                self.postMessage({ type: 'DECRYPT_RESULT', error: 'Decryption key not set.' });
+                self.postMessage({ id, type: 'DECRYPT_RESULT', error: 'Decryption key not set.' });
                 break;
             }
             try {
@@ -33,9 +33,9 @@ self.onmessage = (event: MessageEvent) => {
                 if (!decrypted) {
                     throw new Error('Decryption resulted in empty data.');
                 }
-                self.postMessage({ type: 'DECRYPT_RESULT', payload: { decrypted: JSON.parse(decrypted) } });
+                self.postMessage({ id, type: 'DECRYPT_RESULT', payload: { decrypted: JSON.parse(decrypted) } });
             } catch (error) {
-                self.postMessage({ type: 'DECRYPT_RESULT', error: error.message });
+                self.postMessage({ id, type: 'DECRYPT_RESULT', error: error.message });
             }
             break;
         default:

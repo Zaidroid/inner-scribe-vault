@@ -4,12 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { generateSalt, deriveKey, setSessionKey, decryptWithKey } from '@/lib/encryption';
 import { db } from '@/lib/database';
+import { PasswordPromptModal } from '@/components/PasswordPromptModal';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
+  isKeySet: boolean;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any | null, requires2FA: boolean, challengeId?: string }>;
+  signIn: (email: string, password: string) => Promise<{ error: any | null, requires2FA?: boolean, challengeId?: string }>;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   enableTwoFactor: () => Promise<{ qr: string, secret: string, error: any }>;
@@ -25,28 +27,52 @@ const OLD_ENCRYPTION_KEY = 'selfmastery-app-key';
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [isKeySet, setIsKeySet] = useState(false);
+  const [isPasswordPromptVisible, setIsPasswordPromptVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        if (event === 'SIGNED_OUT') {
+          setIsKeySet(false);
+        }
         setLoading(false);
       }
     );
 
-    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session) {
+        setIsPasswordPromptVisible(true);
+      }
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const handlePasswordSubmit = async (password: string) => {
+    if (!user) {
+        toast({ title: 'Error', description: 'User not found.', variant: 'destructive' });
+        return;
+    }
+    const salt = user.user_metadata?.encryption_salt;
+    if (!salt) {
+        toast({ title: 'Critical Error', description: 'Encryption salt not found.', variant: 'destructive' });
+        return;
+    }
+    const key = deriveKey(password, salt);
+    setSessionKey(key);
+    setIsKeySet(true);
+    setIsPasswordPromptVisible(false);
+    toast({ title: 'Success', description: 'Encryption key set for the session.' });
+    await migrateUserData(key);
+  };
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -71,11 +97,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!salt) {
         const newError = new Error('User does not have an encryption salt. Cannot decrypt data.');
         toast({ title: "Critical Error", description: newError.message, variant: "destructive" });
-        return { error: newError };
+        return { error: newError, requires2FA: false };
       }
       
       const newKey = deriveKey(password, salt);
       setSessionKey(newKey);
+      setIsKeySet(true);
       console.log('Session encryption key has been set.');
       
       await migrateUserData(newKey);
@@ -88,34 +115,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const migrateUserData = async (newKey: string) => {
     console.log('Starting data migration check...');
     try {
-        // We'll check the first journal entry. If it decrypts with the new key, we assume all data is fine.
-        const entries = await db.getJournalEntries(); // This will use the new session key
+        const entries = await db.getJournalEntries();
         if (entries.length > 0 && entries[0].title) {
-            // If title is readable, decryption worked, no migration needed.
             console.log('Data is already using new encryption. No migration needed.');
             return;
         }
 
-        // If we're here, either there's no data, or it's encrypted with the old key.
         console.log('Potential old data detected. Attempting migration...');
 
-        // 1. Get all data using a method that doesn't decrypt (getRaw)
         const rawEntries = await db.getRawJournalEntries();
 
         let migratedCount = 0;
         for (const entry of rawEntries) {
-            // 2. Try decrypting with the old key
             const decryptedTitle = decryptWithKey(entry.title, OLD_ENCRYPTION_KEY);
             
             if (decryptedTitle !== null) {
-                // 3. If successful, re-encrypt with the new key and save.
                 const migratedEntry = {
                     ...entry,
                     title: decryptWithKey(entry.title, OLD_ENCRYPTION_KEY),
                     content: decryptWithKey(entry.content, OLD_ENCRYPTION_KEY),
                     tags: entry.tags.map((t: string) => decryptWithKey(t, OLD_ENCRYPTION_KEY)),
                 };
-                // The normal saveJournalEntry will now use the new session key to encrypt.
                 await db.saveJournalEntry(migratedEntry);
                 migratedCount++;
             }
@@ -124,7 +144,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (migratedCount > 0) {
             console.log(`Successfully migrated ${migratedCount} journal entries to new encryption.`);
         }
-        // Repeat this process for habits, tasks, etc.
         
     } catch (error) {
         console.error('An error occurred during data migration:', error);
@@ -189,7 +208,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
     
     if (!error) {
-        // Mark 2FA as enabled in user metadata for UI state
         await supabase.auth.updateUser({ data: { is_two_factor_enabled: true } });
     }
     
@@ -210,6 +228,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       await supabase.auth.signOut();
       setSessionKey('');
+      setIsKeySet(false);
       toast({
         title: "Signed Out",
         description: "You have been successfully signed out.",
@@ -233,9 +252,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) {
           toast({ title: "2FA Verification Failed", description: error.message, variant: "destructive"});
       } else {
-          // Manually trigger onAuthStateChange to update session
           supabase.auth.getSession().then(({ data: { session } }) => {
-            // This is a bit of a hack to refresh the session state in the app
           });
       }
       return { error };
@@ -245,6 +262,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     <AuthContext.Provider value={{
       user,
       session,
+      isKeySet,
       loading,
       signIn,
       signUp,
@@ -255,6 +273,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       verifyAndSignIn,
     }}>
       {children}
+      <PasswordPromptModal
+        isOpen={isPasswordPromptVisible}
+        onClose={() => setIsPasswordPromptVisible(false)}
+        onSubmit={handlePasswordSubmit}
+      />
     </AuthContext.Provider>
   );
 };
